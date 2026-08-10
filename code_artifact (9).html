@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="ja" class="h-full bg-slate-900 text-white">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>オンラインじゃんけん BATTLE</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;900&display=swap" rel="stylesheet">
+    <!-- PeerJS (WebRTC P2P通信ライブラリ) -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"M PLUS Rounded 1c"', 'sans-serif'],
+                    },
+                    keyframes: {
+                        bounceGentle: {
+                            '0%, 100%': { transform: 'translateY(-5%)' },
+                            '50%': { transform: 'translateY(0)' },
+                        },
+                        popIn: {
+                            '0%': { transform: 'scale(0.5)', opacity: '0' },
+                            '70%': { transform: 'scale(1.1)' },
+                            '100%': { transform: 'scale(1)', opacity: '1' },
+                        }
+                    },
+                    animation: {
+                        'bounce-gentle': 'bounceGentle 2s infinite ease-in-out',
+                        'pop-in': 'popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .hand-shadow {
+            filter: drop-shadow(0px 8px 12px rgba(0,0,0,0.5));
+        }
+        .btn-press {
+            transition: all 0.1s ease;
+        }
+        .btn-press:active {
+            transform: translateY(3px);
+            box-shadow: none !important;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col font-sans select-none antialiased bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 text-slate-100 min-h-screen overflow-x-hidden">
+
+    <!-- トースト通知 -->
+    <div id="toast" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 transform -translate-y-20 opacity-0 transition-all duration-300 pointer-events-none w-11/12 max-w-md">
+        <div class="bg-indigo-600/90 text-white px-5 py-2.5 rounded-full shadow-2xl backdrop-blur-md border border-indigo-400/30 flex items-center justify-center gap-2.5 font-bold text-center text-xs sm:text-sm">
+            <i id="toast-icon" class="fas fa-info-circle text-lg"></i>
+            <span id="toast-msg">通知メッセージ</span>
+        </div>
+    </div>
+
+    <!-- サウンド切替ボタン (右上) -->
+    <div class="absolute top-3 right-3 z-40 flex items-center gap-2">
+        <button id="sound-toggle" class="w-9 h-9 rounded-full bg-slate-800/80 border border-slate-700/80 hover:bg-slate-700 flex items-center justify-center text-indigo-400 transition-colors shadow-lg">
+            <i id="sound-icon" class="fas fa-volume-up text-base"></i>
+        </button>
+    </div>
+
+    <!-- Screen 1: タイトル画面 -->
+    <div id="screen-title" class="flex-1 flex flex-col items-center justify-center p-3 min-h-screen">
+        <div class="max-w-md w-full flex flex-col items-center text-center space-y-6 animate-pop-in">
+            <!-- ロゴ -->
+            <div class="space-y-1">
+                <div class="inline-block bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 font-black text-[10px] sm:text-xs px-3 py-1 rounded-full uppercase tracking-widest shadow-lg">
+                    Serverless & Local P2P Battle
+                </div>
+                <h1 class="text-3xl sm:text-4xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-pink-400 via-purple-300 to-indigo-400 drop-shadow-sm py-1">
+                    オンラインじゃんけん
+                </h1>
+                <p class="text-slate-400 text-xs font-medium">6桁の部屋番号でリアルタイム通信対戦！</p>
+            </div>
+
+            <!-- じゃんけんアイコンのアニメーション展示 -->
+            <div class="flex justify-center items-center gap-6 text-4xl sm:text-5xl py-1">
+                <span class="animate-bounce-gentle inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-900/60 border border-indigo-500/40 text-amber-400 shadow-lg" style="animation-delay: 0s;">
+                    <i class="fa-solid fa-hand-back-fist"></i>
+                </span>
+                <span class="animate-bounce-gentle inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-900/60 border border-indigo-500/40 text-purple-400 shadow-lg" style="animation-delay: 0.2s;">
+                    <i class="fa-solid fa-hand-scissors -rotate-90"></i>
+                </span>
+                <span class="animate-bounce-gentle inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-900/60 border border-indigo-500/40 text-pink-400 shadow-lg" style="animation-delay: 0.4s;">
+                    <i class="fa-solid fa-hand"></i>
+                </span>
+            </div>
+
+            <!-- プレイヤー名・部屋操作フォーム -->
+            <div class="w-full bg-slate-800/60 p-4 sm:p-5 rounded-2xl border border-slate-700/60 backdrop-blur-sm space-y-3.5 shadow-xl">
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-400 text-left mb-1 uppercase tracking-wider">プレイヤー名</label>
+                    <input type="text" id="player-name-input" maxlength="10" placeholder="あなたの名前" 
+                           class="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-3 py-2.5 font-bold text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-center transition-all text-sm">
+                </div>
+
+                <!-- メイン操作ボタン -->
+                <div class="space-y-2.5 pt-1">
+                    <button id="btn-create-room" class="w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white font-black py-3 px-4 rounded-xl shadow-lg shadow-indigo-500/20 hover:brightness-110 active:scale-98 transition-all flex items-center justify-center gap-2 text-base btn-press">
+                        <i class="fas fa-plus-circle"></i>
+                        部屋を作る（ホスト）
+                    </button>
+
+                    <div class="relative flex py-0.5 items-center">
+                        <div class="flex-grow border-t border-slate-700"></div>
+                        <span class="flex-shrink mx-3 text-slate-500 text-[10px] font-bold uppercase">または</span>
+                        <div class="flex-grow border-t border-slate-700"></div>
+                    </div>
+
+                    <!-- 部屋に入る（6桁入力） -->
+                    <div class="flex gap-2">
+                        <input type="text" id="room-code-input" maxlength="6" placeholder="6桁の部屋番号" 
+                               class="w-2/3 bg-slate-900/90 border border-slate-700 rounded-xl px-3 py-2.5 font-mono font-bold text-center tracking-widest text-lg uppercase placeholder-slate-600 focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20">
+                        <button id="btn-join-room" class="w-1/3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-black rounded-xl hover:brightness-110 active:scale-98 transition-all flex items-center justify-center gap-1 shadow-lg shadow-teal-500/20 btn-press text-sm">
+                            参加 <i class="fas fa-arrow-right text-xs"></i>
+                        </button>
+                    </div>
+
+                    <!-- CPU対戦ボタン -->
+                    <button id="btn-cpu-mode" class="w-full bg-slate-700/80 hover:bg-slate-700 text-slate-200 font-bold py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-2 text-xs border border-slate-600/80 btn-press">
+                        <i class="fas fa-robot text-amber-400"></i>
+                        CPU対戦 (1人ですぐ遊ぶ)
+                    </button>
+                </div>
+            </div>
+
+            <div class="text-[11px] text-slate-500 font-medium leading-relaxed">
+                ※同じPCの別タブや別端末同士で6桁番号を入力すれば通信対戦できます。
+            </div>
+        </div>
+    </div>
+
+    <!-- Screen 2: 待機ロビー画面 -->
+    <div id="screen-lobby" class="hidden flex-1 flex flex-col items-center justify-center p-3 min-h-screen">
+        <div class="max-w-md w-full bg-slate-800/80 p-5 sm:p-6 rounded-3xl border border-slate-700/80 backdrop-blur-md shadow-2xl text-center space-y-6 animate-pop-in">
+            <!-- ヘッダー -->
+            <div class="space-y-1">
+                <span id="lobby-role-badge" class="inline-block bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold text-xs px-3 py-0.5 rounded-full">
+                    対戦部屋
+                </span>
+                <h2 id="lobby-heading-text" class="text-xl sm:text-2xl font-black text-white">対戦相手を待っています...</h2>
+            </div>
+
+            <!-- 6桁部屋番号カード -->
+            <div class="bg-slate-900/90 border border-indigo-500/30 p-4 rounded-2xl space-y-1.5 shadow-inner">
+                <div class="text-[11px] font-bold text-slate-400 tracking-wider uppercase">部屋番号 (6桁)</div>
+                <div class="flex items-center justify-center gap-3">
+                    <span id="lobby-room-code" class="font-mono text-3xl sm:text-4xl font-black tracking-widest text-amber-400">------</span>
+                    <button id="btn-copy-code" title="部屋番号をコピー" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl transition-colors border border-slate-700 active:scale-95">
+                        <i class="fas fa-copy text-base"></i>
+                    </button>
+                </div>
+                <p class="text-[11px] text-slate-400">友達にこの6桁の番号を入力してもらおう！</p>
+            </div>
+
+            <!-- プレイヤー対戦カード -->
+            <div class="grid grid-cols-2 gap-3 relative">
+                <!-- VSマーク -->
+                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-gradient-to-r from-pink-500 to-indigo-500 rounded-full flex items-center justify-center font-black text-xs text-white shadow-lg border-2 border-slate-800 z-10">
+                    VS
+                </div>
+
+                <!-- ホスト -->
+                <div class="bg-slate-900/60 p-3 rounded-2xl border border-indigo-500/30 flex flex-col items-center space-y-1">
+                    <div class="w-10 h-10 rounded-full bg-indigo-600/30 border border-indigo-400/50 flex items-center justify-center text-indigo-300 font-bold text-base">
+                        👑
+                    </div>
+                    <div id="lobby-host-name" class="font-bold text-xs truncate max-w-full text-slate-200">ホスト</div>
+                    <div class="text-[9px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded font-bold">HOST</div>
+                </div>
+
+                <!-- ゲスト -->
+                <div id="lobby-guest-card" class="bg-slate-900/60 p-3 rounded-2xl border border-slate-700/50 flex flex-col items-center space-y-1 transition-all">
+                    <div id="lobby-guest-avatar" class="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500 font-bold text-base">
+                        <i class="fas fa-spinner fa-spin text-xs"></i>
+                    </div>
+                    <div id="lobby-guest-name" class="font-bold text-xs truncate max-w-full text-slate-400">接続待機中</div>
+                    <div id="lobby-guest-status" class="text-[9px] bg-slate-800 text-slate-500 px-2 py-0.5 rounded font-bold">WAITING</div>
+                </div>
+            </div>
+
+            <!-- キャンセル / 退出ボタン -->
+            <button id="btn-leave-lobby" class="text-xs text-slate-400 hover:text-red-400 font-bold transition-colors">
+                <i class="fas fa-arrow-left mr-1"></i> 退出してタイトルへ戻る
+            </button>
+        </div>
+    </div>
+
+    <!-- Screen 3: バトル画面 (完全スクロール不要・フィットデザイン) -->
+    <div id="screen-battle" class="hidden flex-1 flex flex-col justify-between p-3 max-w-md mx-auto w-full h-screen max-h-screen relative overflow-hidden">
+
+        <!-- 上部：ヘッダー＆スコアボード -->
+        <div class="w-full bg-slate-800/80 border border-slate-700/80 rounded-2xl p-2.5 backdrop-blur-md shadow-lg space-y-1.5 shrink-0">
+            <div class="flex justify-between items-center text-[11px] font-bold text-slate-400 border-b border-slate-700/60 pb-1">
+                <span id="battle-room-info" class="font-mono text-indigo-400">ROOM: ------</span>
+                <span id="battle-round-count" class="bg-slate-900 px-2.5 py-0.5 rounded-full text-amber-400">ROUND 1</span>
+            </div>
+
+            <!-- スコア表示 -->
+            <div class="grid grid-cols-3 items-center text-center">
+                <!-- 自分 -->
+                <div class="flex flex-col items-center">
+                    <span id="battle-my-name" class="text-xs font-bold text-slate-200 truncate max-w-[80px]">あなた</span>
+                    <span id="battle-my-score" class="text-xl sm:text-2xl font-black text-indigo-400">0</span>
+                </div>
+
+                <!-- 対戦ステータス -->
+                <div class="flex flex-col items-center justify-center">
+                    <div id="battle-status-text" class="text-[10px] font-black text-amber-400 uppercase tracking-wider mb-0.5">
+                        手を選んでね！
+                    </div>
+                    <div class="w-7 h-7 rounded-full bg-slate-900 border-2 border-indigo-400 flex items-center justify-center text-indigo-400 font-black text-xs shadow-inner">
+                        ⚔️
+                    </div>
+                </div>
+
+                <!-- 相手 -->
+                <div class="flex flex-col items-center">
+                    <span id="battle-opponent-name" class="text-xs font-bold text-slate-200 truncate max-w-[80px]">あいて</span>
+                    <span id="battle-opponent-score" class="text-xl sm:text-2xl font-black text-pink-400">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 中央：対戦ステージ -->
+        <div class="my-auto py-1 flex flex-col items-center justify-center relative w-full shrink min-h-0">
+            
+            <!-- 結果カットインオーバーレイ -->
+            <div id="result-overlay" class="absolute inset-0 z-30 flex flex-col items-center justify-center opacity-0 pointer-events-none transition-all duration-300">
+                <div id="result-badge" class="transform scale-50 transition-transform duration-300 font-black text-4xl sm:text-5xl drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)] py-2 px-6 rounded-2xl">
+                    WIN!
+                </div>
+            </div>
+
+            <!-- 対戦プレイヤーの手 -->
+            <div class="w-full flex flex-col items-center justify-center space-y-1">
+
+                <!-- 相手の手 (上) -->
+                <div class="flex flex-col items-center space-y-0.5">
+                    <span class="text-[10px] font-bold text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-full border border-slate-700">
+                        <span id="battle-opp-label">相手</span>の手
+                    </span>
+                    <div id="opp-hand-card" class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-slate-800/90 border-2 border-slate-700 flex items-center justify-center text-3xl sm:text-4xl shadow-xl transition-all duration-300">
+                        <span id="opp-hand-icon" class="hand-shadow transition-transform">
+                            <i class="fa-solid fa-circle-question text-slate-600"></i>
+                        </span>
+                    </div>
+                    <div id="opp-status-badge" class="text-[10px] font-bold text-slate-400 h-3.5">選択中...</div>
+                </div>
+
+                <!-- VSディバイダー -->
+                <div class="relative flex justify-center items-center my-0 z-10">
+                    <div class="bg-gradient-to-r from-indigo-500 to-pink-500 text-white font-black text-[9px] px-2.5 py-0.5 rounded-full shadow border border-slate-800">
+                        VS
+                    </div>
+                </div>
+
+                <!-- 自分の手 (下) -->
+                <div class="flex flex-col items-center space-y-0.5">
+                    <div id="my-status-badge" class="text-[10px] font-bold text-indigo-400 h-3.5">手を選択してください</div>
+                    <div id="my-hand-card" class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-slate-800/90 border-2 border-slate-700 flex items-center justify-center text-3xl sm:text-4xl shadow-xl transition-all duration-300">
+                        <span id="my-hand-icon" class="hand-shadow transition-transform">
+                            <i class="fa-solid fa-circle-question text-slate-600"></i>
+                        </span>
+                    </div>
+                    <span class="text-[10px] font-bold text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-full border border-slate-700">
+                        あなたの手
+                    </span>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- 下部：じゃんけん選択ボタン -->
+        <div class="w-full bg-slate-800/80 border border-slate-700/80 rounded-2xl p-2.5 backdrop-blur-md shadow-2xl space-y-1.5 shrink-0 mb-1">
+            <div id="choice-buttons-title" class="text-center text-[10px] font-bold text-slate-300">
+                出したい手を選んでタップ！
+            </div>
+            
+            <div id="choice-buttons-group" class="grid grid-cols-3 gap-2">
+                <!-- グー -->
+                <button data-choice="rock" class="btn-choice bg-gradient-to-b from-slate-700 to-slate-800 hover:from-indigo-600 hover:to-indigo-700 border-2 border-slate-600 hover:border-indigo-400 rounded-xl py-2 flex flex-col items-center justify-center transition-all shadow-lg active:scale-95 btn-press group">
+                    <span class="text-2xl text-amber-400 group-hover:scale-110 transition-transform mb-0.5">
+                        <i class="fa-solid fa-hand-back-fist"></i>
+                    </span>
+                    <span class="text-[10px] font-black text-slate-200 group-hover:text-white">グー</span>
+                </button>
+
+                <!-- チョキ -->
+                <button data-choice="scissors" class="btn-choice bg-gradient-to-b from-slate-700 to-slate-800 hover:from-purple-600 hover:to-purple-700 border-2 border-slate-600 hover:border-purple-400 rounded-xl py-2 flex flex-col items-center justify-center transition-all shadow-lg active:scale-95 btn-press group">
+                    <span class="text-2xl text-purple-400 group-hover:scale-110 transition-transform mb-0.5 -rotate-90 inline-block">
+                        <i class="fa-solid fa-hand-scissors"></i>
+                    </span>
+                    <span class="text-[10px] font-black text-slate-200 group-hover:text-white">チョキ</span>
+                </button>
+
+                <!-- パー -->
+                <button data-choice="paper" class="btn-choice bg-gradient-to-b from-slate-700 to-slate-800 hover:from-pink-600 hover:to-pink-700 border-2 border-slate-600 hover:border-pink-400 rounded-xl py-2 flex flex-col items-center justify-center transition-all shadow-lg active:scale-95 btn-press group">
+                    <span class="text-2xl text-pink-400 group-hover:scale-110 transition-transform mb-0.5">
+                        <i class="fa-solid fa-hand"></i>
+                    </span>
+                    <span class="text-[10px] font-black text-slate-200 group-hover:text-white">パー</span>
+                </button>
+            </div>
+
+            <!-- 次のラウンド / 退室ボタン（結果表示時） -->
+            <div id="next-round-container" class="hidden flex gap-2 pt-0.5">
+                <button id="btn-next-round" class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 text-white font-black py-2.5 px-3 rounded-xl shadow-lg flex items-center justify-center gap-1.5 btn-press text-xs">
+                    次の勝負へ <i class="fas fa-arrow-right"></i>
+                </button>
+                <button id="btn-exit-game" class="bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold py-2.5 px-3 rounded-xl transition-colors text-xs">
+                    退室
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Web Audio API 効果音発生クラス
+        class SoundFX {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+
+            playTone(freq, type, duration, gainVal = 0.1) {
+                if (!this.enabled) return;
+                try {
+                    this.init();
+                    if (this.ctx.state === 'suspended') {
+                        this.ctx.resume();
+                    }
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(gainVal, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch (e) {
+                    console.error("Audio error:", e);
+                }
+            }
+
+            btnClick() { this.playTone(400, 'sine', 0.08, 0.15); }
+            selectHand() { this.playTone(600, 'triangle', 0.12, 0.2); }
+            win() {
+                if (!this.enabled) return;
+                this.init();
+                [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+                    setTimeout(() => this.playTone(freq, 'sine', 0.2, 0.2), idx * 100);
+                });
+            }
+            lose() {
+                if (!this.enabled) return;
+                this.init();
+                [400, 350, 300, 250].forEach((freq, idx) => {
+                    setTimeout(() => this.playTone(freq, 'sawtooth', 0.25, 0.15), idx * 120);
+                });
+            }
+            draw() {
+                if (!this.enabled) return;
+                this.init();
+                [440, 440].forEach((freq, idx) => {
+                    setTimeout(() => this.playTone(freq, 'square', 0.15, 0.1), idx * 150);
+                });
+            }
+        }
+
+        const sfx = new SoundFX();
+
+        // 通信・ゲーム状態変数
+        let peer = null;
+        let connection = null;
+        let localChannel = null; // BroadcastChannel (ローカルタブ間通信用)
+        let isHost = false;
+        let isCpuMode = false;
+        let myRoomCode = null;
+        let soundOn = true;
+
+        // ゲームデータ
+        let myName = "プレイヤー";
+        let oppName = "あいて";
+        let myScore = 0;
+        let oppScore = 0;
+        let round = 1;
+        let myChoice = null;
+        let oppChoice = null;
+
+        // UIエレメント
+        const screenTitle = document.getElementById('screen-title');
+        const screenLobby = document.getElementById('screen-lobby');
+        const screenBattle = document.getElementById('screen-battle');
+
+        const playerNameInput = document.getElementById('player-name-input');
+        const roomCodeInput = document.getElementById('room-code-input');
+        const btnCreateRoom = document.getElementById('btn-create-room');
+        const btnJoinRoom = document.getElementById('btn-join-room');
+        const btnCpuMode = document.getElementById('btn-cpu-mode');
+
+        const lobbyRoomCode = document.getElementById('lobby-room-code');
+        const lobbyHostName = document.getElementById('lobby-host-name');
+        const lobbyGuestName = document.getElementById('lobby-guest-name');
+        const lobbyHeadingText = document.getElementById('lobby-heading-text');
+        const btnCopyCode = document.getElementById('btn-copy-code');
+        const btnLeaveLobby = document.getElementById('btn-leave-lobby');
+
+        const battleRoomInfo = document.getElementById('battle-room-info');
+        const battleRoundCount = document.getElementById('battle-round-count');
+        const battleMyName = document.getElementById('battle-my-name');
+        const battleOpponentName = document.getElementById('battle-opponent-name');
+        const battleMyScore = document.getElementById('battle-my-score');
+        const battleOpponentScore = document.getElementById('battle-opponent-score');
+
+        const myHandIcon = document.getElementById('my-hand-icon');
+        const oppHandIcon = document.getElementById('opp-hand-icon');
+        const myStatusBadge = document.getElementById('my-status-badge');
+        const oppStatusBadge = document.getElementById('opp-status-badge');
+
+        const resultOverlay = document.getElementById('result-overlay');
+        const resultBadge = document.getElementById('result-badge');
+        const choiceButtonsGroup = document.getElementById('choice-buttons-group');
+        const choiceButtonsTitle = document.getElementById('choice-buttons-title');
+        const nextRoundContainer = document.getElementById('next-round-container');
+        const btnNextRound = document.getElementById('btn-next-round');
+        const btnExitGame = document.getElementById('btn-exit-game');
+
+        const soundToggle = document.getElementById('sound-toggle');
+        const soundIcon = document.getElementById('sound-icon');
+
+        // トースト通知関数
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-msg');
+            const toastIcon = document.getElementById('toast-icon');
+
+            toastMsg.textContent = message;
+            if (type === 'error') {
+                toastIcon.className = "fas fa-exclamation-circle text-red-400 text-base";
+            } else if (type === 'success') {
+                toastIcon.className = "fas fa-check-circle text-emerald-400 text-base";
+            } else {
+                toastIcon.className = "fas fa-info-circle text-indigo-400 text-base";
+            }
+
+            toast.classList.remove('-translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('-translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // サウンド切替
+        soundToggle.addEventListener('click', () => {
+            soundOn = !soundOn;
+            sfx.enabled = soundOn;
+            soundIcon.className = soundOn ? "fas fa-volume-up text-base" : "fas fa-volume-mute text-base text-slate-500";
+            showToast(soundOn ? "サウンドON" : "サウンドOFF");
+        });
+
+        // 画面表示切替
+        function showScreen(screen) {
+            screenTitle.classList.add('hidden');
+            screenLobby.classList.add('hidden');
+            screenBattle.classList.add('hidden');
+            screen.classList.remove('hidden');
+        }
+
+        function getMyName() {
+            const val = playerNameInput.value.trim();
+            return val || (isHost ? "ホスト" : "ゲスト");
+        }
+
+        function formatPeerId(code) {
+            return `janken-p2p-${code}`;
+        }
+
+        // 部屋作成 (ホスト)
+        function createRoom() {
+            sfx.btnClick();
+            isCpuMode = false;
+            const code = Math.floor(100000 + Math.random() * 900000).toString();
+            myRoomCode = code;
+            isHost = true;
+            myName = getMyName();
+
+            setupLocalChannel(code);
+
+            lobbyRoomCode.textContent = myRoomCode;
+            lobbyHostName.textContent = myName;
+            lobbyGuestName.textContent = "接続待機中...";
+            lobbyHeadingText.textContent = "対戦相手を待っています...";
+            showScreen(screenLobby);
+
+            // PeerJS試行 (SecurityError時は安全にスキップしてBroadcastChannelにフォールバック)
+            try {
+                if (window.Peer) {
+                    if (peer) peer.destroy();
+                    peer = new Peer(formatPeerId(code));
+
+                    peer.on('open', () => {
+                        showToast(`部屋番号 ${myRoomCode} を作成しました！`, 'success');
+                    });
+
+                    peer.on('connection', (conn) => {
+                        connection = conn;
+                        setupConnectionListeners();
+                    });
+
+                    peer.on('error', (err) => {
+                        console.warn("PeerJS note:", err.type || err.message);
+                    });
+                }
+            } catch (err) {
+                console.warn("WebSocketは利用できません。ローカルタブ間通信を使用します。", err);
+                showToast(`部屋番号 ${myRoomCode} を作成しました（ローカル通信）`, 'success');
+            }
+        }
+
+        // 部屋参加 (ゲスト)
+        function joinRoom() {
+            sfx.btnClick();
+            isCpuMode = false;
+            const code = roomCodeInput.value.trim();
+            if (code.length !== 6) {
+                showToast("6桁の部屋番号を入力してください", 'error');
+                return;
+            }
+
+            myRoomCode = code;
+            isHost = false;
+            myName = getMyName();
+
+            setupLocalChannel(code);
+
+            // ローカルチャンネルへ参加シグナル送信
+            sendData({ type: 'INIT_USER', name: myName });
+
+            // PeerJS通信試行
+            try {
+                if (window.Peer) {
+                    if (peer) peer.destroy();
+                    peer = new Peer();
+
+                    peer.on('open', () => {
+                        connection = peer.connect(formatPeerId(myRoomCode));
+                        setupConnectionListeners();
+                    });
+
+                    peer.on('error', (err) => {
+                        console.warn("PeerJS connection note:", err);
+                    });
+                }
+            } catch (err) {
+                console.warn("PeerJS接続スキップ。ローカルチャンネルで動作します。");
+            }
+
+            showToast("接続を試みています...", 'info');
+        }
+
+        // BroadcastChannel setup (サンドボックス環境でも100%動くタブ間P2P)
+        function setupLocalChannel(code) {
+            if (localChannel) localChannel.close();
+            try {
+                localChannel = new BroadcastChannel(`janken-channel-${code}`);
+                localChannel.onmessage = (event) => {
+                    handleIncomingMessage(event.data);
+                };
+            } catch (e) {
+                console.warn("BroadcastChannel not supported", e);
+            }
+        }
+
+        // P2Pイベントハンドラ
+        function setupConnectionListeners() {
+            if (!connection) return;
+
+            connection.on('open', () => {
+                showToast("対戦相手と接続されました！", 'success');
+                sendData({ type: 'INIT_USER', name: myName });
+            });
+
+            connection.on('data', (data) => {
+                handleIncomingMessage(data);
+            });
+
+            connection.on('close', () => {
+                showToast("対戦相手が切断しました", 'error');
+                setTimeout(() => leaveRoom(), 2000);
+            });
+        }
+
+        // 共通送信メソッド
+        function sendData(msg) {
+            if (connection && connection.open) {
+                try { connection.send(msg); } catch (e) {}
+            }
+            if (localChannel) {
+                try { localChannel.postMessage(msg); } catch (e) {}
+            }
+        }
+
+        // 受信データハンドラ
+        function handleIncomingMessage(data) {
+            if (!data || !data.type) return;
+
+            switch (data.type) {
+                case 'INIT_USER':
+                    // 相手が参加してきた
+                    if (data.name !== myName) {
+                        oppName = data.name;
+                        if (isHost) {
+                            sendData({ type: 'INIT_USER_ACK', name: myName });
+                            startBattle();
+                        }
+                    }
+                    break;
+
+                case 'INIT_USER_ACK':
+                    oppName = data.name;
+                    startBattle();
+                    break;
+
+                case 'CHOICE':
+                    oppChoice = data.choice;
+                    oppStatusBadge.textContent = "相手：選択済み！";
+                    oppStatusBadge.className = "text-[10px] font-bold text-emerald-400 h-3.5";
+                    
+                    if (isHost && myChoice && oppChoice) {
+                        evaluateRound();
+                    }
+                    break;
+
+                case 'ROUND_RESULT':
+                    showRoundResult(data.hostChoice, data.guestChoice, data.winnerRole, data.hostScore, data.guestScore);
+                    break;
+
+                case 'NEXT_ROUND':
+                    round++;
+                    resetRoundUI();
+                    break;
+            }
+        }
+
+        // CPUモード開始
+        function startCpuMode() {
+            sfx.btnClick();
+            isCpuMode = true;
+            isHost = true;
+            myRoomCode = "CPU-VS";
+            myName = getMyName();
+            oppName = "CPU (コンピューター)";
+
+            startBattle();
+        }
+
+        // バトル開始
+        function startBattle() {
+            round = 1;
+            myScore = 0;
+            oppScore = 0;
+
+            battleRoomInfo.textContent = `ROOM: ${myRoomCode}`;
+            battleMyName.textContent = myName;
+            battleOpponentName.textContent = oppName;
+            battleMyScore.textContent = myScore;
+            battleOpponentScore.textContent = oppScore;
+
+            resetRoundUI();
+            showScreen(screenBattle);
+            sfx.win();
+        }
+
+        // ラウンド初期化
+        function resetRoundUI() {
+            myChoice = null;
+            oppChoice = null;
+
+            battleRoundCount.textContent = `ROUND ${round}`;
+            
+            myHandIcon.innerHTML = getHandHTML(null);
+            myStatusBadge.textContent = "出したい手を選んでね";
+            myStatusBadge.className = "text-[10px] font-bold text-indigo-400 h-3.5";
+
+            oppHandIcon.innerHTML = getHandHTML(null);
+            oppStatusBadge.textContent = "相手：選択中...";
+            oppStatusBadge.className = "text-[10px] font-bold text-slate-400 h-3.5";
+
+            disableChoiceButtons(false);
+
+            resultOverlay.classList.add('opacity-0', 'pointer-events-none');
+            nextRoundContainer.classList.add('hidden');
+            choiceButtonsGroup.classList.remove('hidden');
+            choiceButtonsTitle.classList.remove('hidden');
+        }
+
+        // 手の選択
+        function selectHand(choice) {
+            sfx.selectHand();
+            myChoice = choice;
+
+            myHandIcon.innerHTML = getHandHTML(choice);
+            myStatusBadge.textContent = "あなたの手：選択完了！";
+            myStatusBadge.className = "text-[10px] font-bold text-emerald-400 h-3.5 animate-pulse";
+            disableChoiceButtons(true);
+
+            if (isCpuMode) {
+                // CPUランダム選択
+                const cpuChoices = ['rock', 'scissors', 'paper'];
+                oppChoice = cpuChoices[Math.floor(Math.random() * cpuChoices.length)];
+                setTimeout(() => evaluateRound(), 500);
+            } else {
+                sendData({ type: 'CHOICE', choice: choice });
+                if (isHost && myChoice && oppChoice) {
+                    evaluateRound();
+                }
+            }
+        }
+
+        // 勝敗計算
+        function evaluateRound() {
+            const hostChoice = myChoice;
+            const guestChoice = oppChoice;
+
+            let winnerRole = 'draw';
+
+            if (hostChoice === guestChoice) {
+                winnerRole = 'draw';
+            } else if (
+                (hostChoice === 'rock' && guestChoice === 'scissors') ||
+                (hostChoice === 'scissors' && guestChoice === 'paper') ||
+                (hostChoice === 'paper' && guestChoice === 'rock')
+            ) {
+                winnerRole = 'host';
+                myScore += 1;
+            } else {
+                winnerRole = 'guest';
+                oppScore += 1;
+            }
+
+            const resultMsg = {
+                type: 'ROUND_RESULT',
+                hostChoice: hostChoice,
+                guestChoice: guestChoice,
+                winnerRole: winnerRole,
+                hostScore: myScore,
+                guestScore: oppScore
+            };
+
+            if (!isCpuMode) sendData(resultMsg);
+            showRoundResult(hostChoice, guestChoice, winnerRole, myScore, oppScore);
+        }
+
+        // 結果表示
+        function showRoundResult(hostChoice, guestChoice, winnerRole, hostScore, guestScore) {
+            const myActualChoice = isHost ? hostChoice : guestChoice;
+            const oppActualChoice = isHost ? guestChoice : hostChoice;
+
+            myHandIcon.innerHTML = getHandHTML(myActualChoice);
+            oppHandIcon.innerHTML = getHandHTML(oppActualChoice);
+
+            if (isHost) {
+                myScore = hostScore;
+                oppScore = guestScore;
+            } else {
+                myScore = guestScore;
+                oppScore = hostScore;
+            }
+            battleMyScore.textContent = myScore;
+            battleOpponentScore.textContent = oppScore;
+
+            let outcome = "draw";
+            if (winnerRole === 'draw') {
+                outcome = "draw";
+            } else if ((isHost && winnerRole === 'host') || (!isHost && winnerRole === 'guest')) {
+                outcome = "win";
+            } else {
+                outcome = "lose";
+            }
+
+            showResultCutin(outcome);
+
+            choiceButtonsGroup.classList.add('hidden');
+            choiceButtonsTitle.classList.add('hidden');
+            nextRoundContainer.classList.remove('hidden');
+        }
+
+        // アイコン表示生成
+        function getHandHTML(choice) {
+            switch (choice) {
+                case 'rock': 
+                    return '<i class="fa-solid fa-hand-back-fist text-amber-400 animate-pop-in"></i>';
+                case 'scissors': 
+                    return '<i class="fa-solid fa-hand-scissors text-purple-400 -rotate-90 inline-block animate-pop-in"></i>';
+                case 'paper': 
+                    return '<i class="fa-solid fa-hand text-pink-400 animate-pop-in"></i>';
+                default: 
+                    return '<i class="fa-solid fa-circle-question text-slate-600"></i>';
+            }
+        }
+
+        function disableChoiceButtons(disabled) {
+            const btns = document.querySelectorAll('.btn-choice');
+            btns.forEach(btn => {
+                btn.disabled = disabled;
+                if (disabled) {
+                    btn.classList.add('opacity-50', 'cursor-not-allowed');
+                } else {
+                    btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            });
+        }
+
+        function leaveRoom() {
+            sfx.btnClick();
+            if (connection) { try { connection.close(); } catch(e){} }
+            if (peer) { try { peer.destroy(); } catch(e){} }
+            if (localChannel) { try { localChannel.close(); } catch(e){} }
+            peer = null;
+            connection = null;
+            localChannel = null;
+            showScreen(screenTitle);
+        }
+
+        function showResultCutin(outcome) {
+            if (outcome === 'win') {
+                resultBadge.textContent = "WIN!";
+                resultBadge.className = "transform transition-all duration-300 font-black text-4xl sm:text-5xl drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)] py-2 px-6 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 border-4 border-amber-200 animate-pop-in";
+                sfx.win();
+            } else if (outcome === 'lose') {
+                resultBadge.textContent = "LOSE...";
+                resultBadge.className = "transform transition-all duration-300 font-black text-4xl sm:text-5xl drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)] py-2 px-6 rounded-2xl bg-gradient-to-r from-slate-700 to-slate-900 text-slate-300 border-4 border-slate-600 animate-pop-in";
+                sfx.lose();
+            } else {
+                resultBadge.textContent = "DRAW";
+                resultBadge.className = "transform transition-all duration-300 font-black text-4xl sm:text-5xl drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)] py-2 px-6 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-4 border-indigo-400 animate-pop-in";
+                sfx.draw();
+            }
+            resultOverlay.classList.remove('opacity-0', 'pointer-events-none');
+            resultOverlay.classList.add('opacity-100');
+        }
+
+        function nextRound() {
+            sfx.btnClick();
+            round++;
+            if (!isCpuMode) {
+                sendData({ type: 'NEXT_ROUND' });
+            }
+            resetRoundUI();
+        }
+
+        // イベントリスナー接続
+        btnCreateRoom.addEventListener('click', createRoom);
+        btnJoinRoom.addEventListener('click', joinRoom);
+        btnCpuMode.addEventListener('click', startCpuMode);
+        btnLeaveLobby.addEventListener('click', leaveRoom);
+        btnExitGame.addEventListener('click', leaveRoom);
+        btnNextRound.addEventListener('click', nextRound);
+
+        document.querySelectorAll('.btn-choice').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const choice = e.currentTarget.getAttribute('data-choice');
+                selectHand(choice);
+            });
+        });
+
+        // 部屋番号コピー
+        btnCopyCode.addEventListener('click', () => {
+            sfx.btnClick();
+            const code = lobbyRoomCode.textContent;
+            if (code && code !== '------') {
+                const tempInput = document.createElement('input');
+                tempInput.value = code;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                try {
+                    document.execCommand('copy');
+                    showToast(`部屋番号 ${code} をコピーしました！`, 'success');
+                } catch (err) {
+                    showToast("コピーに失敗しました", 'error');
+                }
+                document.body.removeChild(tempInput);
+            }
+        });
+
+        // 数字のみ入力制限
+        roomCodeInput.addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/[^0-9]/g, '').slice(0, 6);
+        });
+
+    </script>
+</body>
+</html>
