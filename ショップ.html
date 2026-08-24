@@ -888,7 +888,11 @@
 
                         conn.on('data', (data) => {
                             if (data.type === 'PURCHASE_NOTIFICATION') {
-                                this.logHost(`[SALE 🎉] 商品 「${data.itemName}」 が ${data.price} Robux で売れました！`);
+                                const earned = parseInt(data.price) || 0;
+                                // ホスト（店主）のRobuxを加算して表示を更新
+                                this.userRobux += earned;
+                                this.updateRobuxDisplays();
+                                this.logHost(`[SALE 🎉] 商品 「${data.itemName}」 が ${earned} Robux で売れました！ (売上金 +${earned} Robux 獲得)`);
                             }
                         });
 
@@ -1040,6 +1044,11 @@
                         itemName: item.name,
                         price: item.price
                     });
+                } else if (this.activeBrowseShop === this.shopData) {
+                    // 自店舗のローカルテスト購入の場合、店主側としても売上金を加算
+                    this.userRobux += item.price;
+                    this.updateRobuxDisplays();
+                    this.showToast(`💰 自店舗での売上 +${item.price} Robux を獲得しました！`);
                 }
 
                 if (item.type === 'lucky') {
