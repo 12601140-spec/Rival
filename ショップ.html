@@ -3,1472 +3,1236 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Robux Gacha P2P Market - DIV-Free Edition</title>
-    
-    <!-- PeerJS CDN for Serverless P2P Connection -->
+    <title>Robux P2P Super Shop</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PeerJS CDN -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <style>
-        :root {
-            --bg-primary: #0a0c16;
-            --bg-secondary: #131728;
-            --bg-tertiary: #1c233e;
-            --bg-card: #181f36;
-            --accent-gold: #ffd700;
-            --accent-gold-glow: rgba(255, 215, 0, 0.4);
-            --accent-cyan: #00f2ff;
-            --accent-pink: #ff007f;
-            --accent-green: #00ff88;
-            --text-main: #f0f4ff;
-            --text-sub: #8a99ad;
-            --border-radius: 16px;
-            --border-radius-sm: 8px;
-            --aura-red: #ff3366;
-            --aura-blue: #3399ff;
-            --aura-gold: #ffd700;
-            --aura-purple: #aa00ff;
-            --aura-rainbow: linear-gradient(45deg, red, orange, yellow, green, blue, indigo, violet);
+        /* Custom Aura Animations and Glow Effects */
+        @keyframes aura-red {
+            0%, 100% { box-shadow: 0 0 15px #ef4444, inset 0 0 10px #ef4444; }
+            50% { box-shadow: 0 0 30px #f87171, inset 0 0 20px #f87171; }
         }
+        @keyframes aura-blue {
+            0%, 100% { box-shadow: 0 0 15px #3b82f6, inset 0 0 10px #3b82f6; }
+            50% { box-shadow: 0 0 30px #60a5fa, inset 0 0 20px #60a5fa; }
+        }
+        @keyframes aura-green {
+            0%, 100% { box-shadow: 0 0 15px #10b981, inset 0 0 10px #10b981; }
+            50% { box-shadow: 0 0 30px #34d399, inset 0 0 20px #34d399; }
+        }
+        @keyframes aura-gold {
+            0%, 100% { box-shadow: 0 0 20px #f59e0b, inset 0 0 12px #f59e0b; }
+            50% { box-shadow: 0 0 40px #fbbf24, inset 0 0 25px #fbbf24; }
+        }
+        @keyframes aura-purple {
+            0%, 100% { box-shadow: 0 0 18px #8b5cf6, inset 0 0 10px #8b5cf6; }
+            50% { box-shadow: 0 0 35px #a78bfa, inset 0 0 20px #a78bfa; }
+        }
+        @keyframes aura-rainbow {
+            0% { box-shadow: 0 0 20px #ef4444; }
+            20% { box-shadow: 0 0 20px #f59e0b; }
+            40% { box-shadow: 0 0 20px #10b981; }
+            60% { box-shadow: 0 0 20px #3b82f6; }
+            80% { box-shadow: 0 0 20px #8b5cf6; }
+            100% { box-shadow: 0 0 20px #ef4444; }
+        }
+        
+        .aura-red { animation: aura-red 2s infinite ease-in-out; border: 2px solid #ef4444; }
+        .aura-blue { animation: aura-blue 2s infinite ease-in-out; border: 2px solid #3b82f6; }
+        .aura-green { animation: aura-green 2s infinite ease-in-out; border: 2px solid #10b981; }
+        .aura-gold { animation: aura-gold 1.5s infinite ease-in-out; border: 2px solid #f59e0b; }
+        .aura-purple { animation: aura-purple 2s infinite ease-in-out; border: 2px solid #8b5cf6; }
+        .aura-rainbow { animation: aura-rainbow 3s infinite linear; border: 2px solid #ec4899; }
+        .aura-none { border: 2px solid #4b5563; }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            -webkit-tap-highlight-color: transparent;
-            user-select: none;
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 0.8; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.05); }
         }
+        .animate-pulse-glow { animation: pulse-glow 1.5s infinite; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #111827; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
 
         body {
-            background-color: var(--bg-primary);
-            color: var(--text-main);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow-x: hidden;
-            background-image: 
-                radial-gradient(circle at 10% 20%, rgba(0, 242, 255, 0.05) 0%, transparent 20%),
-                radial-gradient(circle at 90% 80%, rgba(255, 0, 127, 0.05) 0%, transparent 20%);
-        }
-
-        header {
-            background: rgba(19, 23, 40, 0.85);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            padding: 12px 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        header h1 {
-            font-size: 1.1rem;
-            font-weight: 800;
-            letter-spacing: 0.5px;
-            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-pink));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        figure.status-widget {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            background: var(--bg-tertiary);
-            padding: 6px 14px;
-            border-radius: 50px;
-            border: 1px solid rgba(255, 215, 0, 0.2);
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
-        }
-
-        span.robux-badge {
-            color: var(--accent-gold);
-            font-weight: 800;
-            font-size: 0.95rem;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            text-shadow: 0 0 8px var(--accent-gold-glow);
-        }
-
-        span.p2p-status {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: var(--text-sub);
-            display: inline-block;
-            transition: background 0.3s;
-        }
-
-        span.p2p-status.online {
-            background: var(--accent-green);
-            box-shadow: 0 0 8px var(--accent-green);
-        }
-
-        nav.app-nav {
-            display: flex;
-            background: var(--bg-secondary);
-            padding: 6px;
-            margin: 12px 16px 0;
-            border-radius: var(--border-radius);
-            gap: 6px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
-        button.nav-btn {
-            flex: 1;
-            padding: 10px 4px;
-            border: none;
-            background: transparent;
-            color: var(--text-sub);
-            font-weight: 700;
-            font-size: 0.8rem;
-            border-radius: var(--border-radius-sm);
-            cursor: pointer;
-            transition: all 0.25s ease;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 4px;
-        }
-
-        button.nav-btn.active {
-            background: var(--bg-tertiary);
-            color: var(--accent-cyan);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(0, 242, 255, 0.2);
-        }
-
-        main.app-container {
-            flex: 1;
-            padding: 16px;
-            max-width: 800px;
-            width: 100%;
-            margin: 0 auto;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        section.tab-content {
-            display: none;
-            flex-direction: column;
-            gap: 16px;
-            animation: fadeIn 0.3s ease-in-out;
-        }
-
-        section.tab-content.active {
-            display: flex;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(6px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        article.card {
-            background: var(--bg-card);
-            border-radius: var(--border-radius);
-            padding: 18px;
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
-        }
-
-        article.card h2 {
-            font-size: 1.1rem;
-            color: var(--text-main);
-            border-bottom: 2px solid rgba(255, 255, 255, 0.05);
-            padding-bottom: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        label.form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            font-size: 0.85rem;
-            color: var(--text-sub);
-            font-weight: 600;
-        }
-
-        input[type="text"],
-        input[type="number"],
-        select,
-        textarea {
-            width: 100%;
-            padding: 12px 14px;
-            background: var(--bg-secondary);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: var(--border-radius-sm);
-            color: var(--text-main);
-            font-size: 0.95rem;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-
-        input[type="text"]:focus,
-        input[type="number"]:focus,
-        select:focus,
-        textarea:focus {
-            border-color: var(--accent-cyan);
-        }
-
-        label.file-upload-btn {
-            background: var(--bg-tertiary);
-            border: 2px dashed rgba(255, 255, 255, 0.2);
-            padding: 16px;
-            border-radius: var(--border-radius-sm);
-            text-align: center;
-            cursor: pointer;
-            color: var(--text-sub);
-            transition: all 0.2s;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 6px;
-        }
-
-        label.file-upload-btn:hover {
-            border-color: var(--accent-cyan);
-            color: var(--text-main);
-        }
-
-        input[type="file"] {
-            display: none;
-        }
-
-        button.action-btn {
-            background: linear-gradient(135deg, #00f2ff, #0077ff);
-            color: #000;
-            font-weight: 800;
-            padding: 14px;
-            border: none;
-            border-radius: var(--border-radius-sm);
-            cursor: pointer;
-            font-size: 0.95rem;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            box-shadow: 0 4px 15px rgba(0, 242, 255, 0.3);
-        }
-
-        button.action-btn:active {
-            transform: scale(0.98);
-        }
-
-        button.action-btn.secondary {
-            background: var(--bg-tertiary);
-            color: var(--text-main);
-            box-shadow: none;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        button.action-btn.danger {
-            background: linear-gradient(135deg, #ff0055, #990033);
-            color: #fff;
-            box-shadow: 0 4px 15px rgba(255, 0, 85, 0.3);
-        }
-
-        button.action-btn.success {
-            background: linear-gradient(135deg, #00ff88, #009944);
-            color: #000;
-            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
-        }
-
-        figure.aura-box {
-            position: relative;
-            border-radius: var(--border-radius-sm);
-            padding: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2.2rem;
-            background: rgba(0, 0, 0, 0.3);
-            transition: transform 0.3s;
-        }
-
-        figure.aura-red {
-            border: 2px solid var(--aura-red);
-            box-shadow: inset 0 0 15px var(--aura-red), 0 0 15px var(--aura-red);
-        }
-        figure.aura-blue {
-            border: 2px solid var(--aura-blue);
-            box-shadow: inset 0 0 15px var(--aura-blue), 0 0 15px var(--aura-blue);
-        }
-        figure.aura-gold {
-            border: 2px solid var(--aura-gold);
-            box-shadow: inset 0 0 15px var(--aura-gold), 0 0 15px var(--aura-gold);
-        }
-        figure.aura-purple {
-            border: 2px solid var(--aura-purple);
-            box-shadow: inset 0 0 15px var(--aura-purple), 0 0 15px var(--aura-purple);
-        }
-        figure.aura-rainbow {
-            border: 2px solid transparent;
-            background-image: linear-gradient(var(--bg-card), var(--bg-card)), var(--aura-rainbow);
-            background-origin: border-box;
-            background-clip: padding-box, border-box;
-            box-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
-        }
-
-        ul.item-grid {
-            list-style: none;
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-            gap: 12px;
-        }
-
-        li.item-card {
-            background: var(--bg-secondary);
-            border-radius: var(--border-radius-sm);
-            padding: 12px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            position: relative;
-        }
-
-        li.item-card h3 {
-            font-size: 0.85rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        li.item-card p.price {
-            color: var(--accent-gold);
-            font-weight: 800;
-            font-size: 0.9rem;
-        }
-
-        dialog.roulette-dialog {
-            margin: auto;
-            background: var(--bg-card);
-            color: var(--text-main);
-            border: 2px solid var(--accent-gold);
-            border-radius: var(--border-radius);
-            padding: 24px;
-            width: 90%;
-            max-width: 400px;
-            box-shadow: 0 0 40px rgba(255, 215, 0, 0.3);
-            text-align: center;
-        }
-
-        dialog::backdrop {
-            background: rgba(0, 0, 0, 0.85);
-            backdrop-filter: blur(8px);
-        }
-
-        section.roulette-container {
-            height: 120px;
-            margin: 20px 0;
-            background: var(--bg-secondary);
-            border-radius: var(--border-radius);
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            position: relative;
-        }
-
-        figure.roulette-display {
-            font-size: 4rem;
-            transition: transform 0.05s linear;
-        }
-
-        aside.toast-notification {
-            position: fixed;
-            bottom: 24px;
-            left: 50%;
-            transform: translateX(-50%) translateY(100px);
-            background: rgba(19, 23, 40, 0.95);
-            border: 1px solid var(--accent-cyan);
-            color: var(--text-main);
-            padding: 12px 24px;
-            border-radius: 50px;
-            font-weight: 700;
-            font-size: 0.85rem;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-            opacity: 0;
-            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            z-index: 1000;
-            pointer-events: none;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        aside.toast-notification.show {
-            transform: translateX(-50%) translateY(0);
-            opacity: 1;
-        }
-
-        textarea.code-box {
-            font-family: monospace;
-            font-size: 0.75rem;
-            height: 80px;
-            resize: none;
-            background: #000;
-            color: var(--accent-green);
-        }
-
-        footer {
-            padding: 16px;
-            text-align: center;
-            font-size: 0.75rem;
-            color: var(--text-sub);
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
-            margin-top: auto;
-        }
-
-        section.lucky-entry-item {
-            background: var(--bg-tertiary);
-            padding: 12px;
-            border-radius: var(--border-radius-sm);
-            margin-bottom: 8px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            border: 1px dashed rgba(255, 255, 255, 0.15);
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #090d16;
+            color: #f3f4f6;
         }
     </style>
 </head>
-<body>
+<body class="min-h-screen flex flex-col justify-between overflow-x-hidden">
 
-    <header>
-        <h1>🛍️ Robux Market</h1>
-        <figure class="status-widget">
-            <span class="robux-badge">💰 <span id="robux-amount">1000</span> R$</span>
-            <span class="p2p-status" id="p2p-indicator" title="P2P Status"></span>
-        </figure>
+    <!-- Top Bar Navigation (NO DIV USED!) -->
+    <header class="bg-gray-900/90 backdrop-blur-md border-b border-cyan-500/30 sticky top-0 z-40 px-4 py-3 shadow-lg">
+        <nav class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            <figure class="flex items-center gap-3">
+                <span class="text-3xl animate-bounce">🛒</span>
+                <figcaption class="flex flex-col">
+                    <h1 class="text-xl md:text-2xl font-black bg-gradient-to-r from-cyan-400 via-fuchsia-500 to-yellow-400 bg-clip-text text-transparent">
+                        ROBUX P2P STORE
+                    </h1>
+                    <span class="text-xs text-cyan-400 font-mono tracking-wider">SERVERLESS NETWORK V2.5</span>
+                </figcaption>
+            </figure>
+
+            <section class="flex items-center gap-4 bg-gray-800/80 px-4 py-2 rounded-full border border-yellow-500/40 shadow-inner">
+                <span class="text-2xl">💰</span>
+                <p class="flex flex-col">
+                    <span class="text-xs text-gray-400 font-bold">BALANCE</span>
+                    <span id="user-robux-display" class="text-lg font-black text-yellow-400 font-mono">1,000 Robux</span>
+                </p>
+                <button onclick="App.openFullSaveModal()" class="ml-1 bg-yellow-500 hover:bg-yellow-400 text-gray-950 font-black px-3 py-1 rounded-full text-xs transition transform active:scale-95 flex items-center gap-1 shadow-md">
+                    <i class="fa-solid fa-key"></i>
+                    <span>セーブコード発行</span>
+                </button>
+                <button onclick="App.importFullSavePrompt()" class="bg-cyan-600 hover:bg-cyan-500 text-white font-black px-3 py-1 rounded-full text-xs transition transform active:scale-95 flex items-center gap-1 shadow-md">
+                    <i class="fa-solid fa-file-import"></i>
+                    <span>コードロード</span>
+                </button>
+            </section>
+        </nav>
     </header>
 
-    <nav class="app-nav">
-        <button class="nav-btn active" onclick="switchTab('create')">
-            <span>🛠️</span>
-            <span>作る</span>
-        </button>
-        <button class="nav-btn" onclick="switchTab('open')">
-            <span>開店</span>
-            <span>開く</span>
-        </button>
-        <button class="nav-btn" onclick="switchTab('view')">
-            <span>🛒</span>
-            <span>見る</span>
-        </button>
-        <button class="nav-btn" onclick="switchTab('inventory')">
-            <span>🎒</span>
-            <span>所持品</span>
-        </button>
-    </nav>
+    <!-- Main Content Area -->
+    <main class="flex-grow max-w-7xl w-full mx-auto p-3 sm:p-6 flex flex-col gap-6">
+        
+        <!-- Navigation Buttons Row (NO DIV) -->
+        <nav class="grid grid-cols-3 gap-2 sm:gap-4">
+            <button id="btn-tab-build" onclick="App.switchTab('build')" class="p-3 sm:p-4 rounded-xl font-bold text-sm sm:text-base flex flex-col sm:flex-row items-center justify-center gap-2 border transition duration-200 bg-gradient-to-br from-cyan-900/60 to-gray-900 border-cyan-500 text-cyan-300 shadow-lg hover:border-cyan-400 active:scale-98">
+                <span class="text-2xl">🔨</span>
+                <span class="tracking-wide">ショップを作る</span>
+            </button>
+            <button id="btn-tab-open" onclick="App.switchTab('open')" class="p-3 sm:p-4 rounded-xl font-bold text-sm sm:text-base flex flex-col sm:flex-row items-center justify-center gap-2 border transition duration-200 bg-gray-900/80 border-gray-700 text-gray-400 shadow-lg hover:border-green-500/50 active:scale-98">
+                <span class="text-2xl">📡</span>
+                <span class="tracking-wide">ショップを開く</span>
+            </button>
+            <button id="btn-tab-browse" onclick="App.switchTab('browse')" class="p-3 sm:p-4 rounded-xl font-bold text-sm sm:text-base flex flex-col sm:flex-row items-center justify-center gap-2 border transition duration-200 bg-gray-900/80 border-gray-700 text-gray-400 shadow-lg hover:border-fuchsia-500/50 active:scale-98">
+                <span class="text-2xl">🛍️</span>
+                <span class="tracking-wide">ショップを見る</span>
+            </button>
+        </nav>
 
-    <main class="app-container">
-
-        <!-- Tab 1: Shop Creation -->
-        <section id="tab-create" class="tab-content active">
-            <article class="card">
-                <h2>🏪 ショップ基本設定</h2>
-                <label class="form-group">
-                    ショップ名
-                    <input type="text" id="shop-name-input" placeholder="例: 伝説のメガショップ" value="マイマーケット">
-                </label>
-                <label class="form-group">
-                    店長キャラクター (絵文字)
-                    <select id="shop-owner-emoji">
-                        <option value="👑">👑 王様</option>
-                        <option value="🐱">🐱 ネコ店長</option>
-                        <option value="🤖">🤖 ロボ店長</option>
-                        <option value="🧙‍♂️">🧙‍♂️ 魔法使い</option>
-                        <option value="🦊">🦊 キツネ</option>
-                        <option value="👽">👽 宇宙人</option>
-                    </select>
-                </label>
-            </article>
-
-            <article class="card">
-                <h2>📦 出品中の商品リスト</h2>
-                <ul class="item-grid" id="builder-item-list">
-                    <!-- Dynamic Items loaded here -->
-                </ul>
-                <fieldset style="border:none; display:flex; gap:8px;">
-                    <button class="action-btn" style="flex:1" onclick="openNormalItemModal()">➕ 普通の商品を追加</button>
-                    <button class="action-btn secondary" style="flex:1" onclick="openLuckyBlockModal()">❓ ラッキーブロック追加</button>
-                </fieldset>
-            </article>
-
-            <article class="card">
-                <h2>💾 セーブ & ロード</h2>
-                <p style="font-size: 0.8rem; color: var(--text-sub);">ショップデータと所持品を暗号化テキストコードとして保存できます。</p>
-                <button class="action-btn success" onclick="generateSaveCode()">🔒 セーブコードを生成・コピー</button>
-                <textarea class="code-box" id="save-code-output" readonly placeholder="セーブコードがここに表示されます"></textarea>
-                <label class="form-group" style="margin-top: 8px;">
-                    ロードコード入力
-                    <textarea class="code-box" id="load-code-input" placeholder="ここにセーブコードを貼り付け"></textarea>
-                </label>
-                <button class="action-btn secondary" onclick="loadSaveCode()">🔓 データをロード</button>
-            </article>
-        </section>
-
-        <!-- Tab 2: Open Shop -->
-        <section id="tab-open" class="tab-content">
-            <article class="card">
-                <h2>📡 サーバーレス P2P 開店管理</h2>
-                <p style="font-size: 0.85rem; color: var(--text-sub);">
-                    中央サーバーなしでPeerJSを介してあなたのショップをネットワークに公開します。他のプレイヤーが直接訪問・購入できるようになります。
-                </p>
+        <!-- SECTION 1: BUILD SHOP (ショップを作る) -->
+        <section id="section-build" class="flex flex-col gap-6">
+            <header class="bg-gray-900/80 border border-cyan-500/30 rounded-2xl p-5 shadow-2xl backdrop-blur-sm">
+                <h2 class="text-xl font-black text-cyan-400 flex items-center gap-2 mb-4">
+                    <i class="fa-solid fa-store"></i>
+                    <span>店舗基本データ設定</span>
+                </h2>
                 
-                <figure style="background: var(--bg-secondary); padding: 12px; border-radius: var(--border-radius-sm); text-align: center;">
-                    <p style="font-size: 0.8rem; color: var(--text-sub);">あなたの固有 P2P ID</p>
-                    <strong id="my-peer-id" style="font-size: 1.1rem; color: var(--accent-cyan); word-break: break-all;">接続待ち...</strong>
-                </figure>
+                <form onsubmit="event.preventDefault();" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <label class="flex flex-col gap-1">
+                        <span class="text-xs font-bold text-gray-300">ショップ名</span>
+                        <input type="text" id="shop-name-input" placeholder="例: ハイパーRobuxショップ" class="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-400 font-bold" value="マイ★ドリームショップ">
+                    </label>
 
-                <button class="action-btn success" id="btn-open-shop" onclick="toggleShopOpen(true)">🚀 ショップを公開 (開店)</button>
-                <button class="action-btn danger" id="btn-close-shop" onclick="toggleShopOpen(false)" style="display:none;">⛔ 店を閉じる (閉店)</button>
+                    <label class="flex flex-col gap-1">
+                        <span class="text-xs font-bold text-gray-300">店長 (絵文字を選択)</span>
+                        <select id="shop-owner-emoji" class="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-400 text-xl">
+                            <option value="👑">👑 王様</option>
+                            <option value="🤖">🤖 ロボット</option>
+                            <option value="🐱">🐱 ネコ店長</option>
+                            <option value="🧙‍♂️">🧙‍♂️ 魔法使い</option>
+                            <option value="🦊">🦊 キツネ</option>
+                            <option value="👽">👽 宇宙人</option>
+                            <option value="😎">😎 COOL店主</option>
+                        </select>
+                    </label>
+                </form>
 
-                <figure style="margin-top: 8px;">
-                    <h3 style="font-size: 0.9rem; margin-bottom: 8px;">📋 来店・売上ログ</h3>
-                    <ul id="shop-logs" style="list-style: none; font-size: 0.8rem; color: var(--text-sub); display: flex; flex-direction: column; gap: 4px; max-height: 150px; overflow-y: auto;">
-                        <li>ログはありません。</li>
-                    </ul>
-                </figure>
+                <footer class="mt-4 flex flex-wrap gap-3 items-center justify-between border-t border-gray-800 pt-4">
+                    <section class="flex gap-2">
+                        <button onclick="App.openFullSaveModal()" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-4 py-2 rounded-lg text-sm flex items-center gap-2 shadow-lg transition active:scale-95">
+                            <i class="fa-solid fa-key"></i>
+                            <span>セーブコード発行</span>
+                        </button>
+                        <button onclick="App.importFullSavePrompt()" class="bg-gray-700 hover:bg-gray-600 text-white font-bold px-4 py-2 rounded-lg text-sm flex items-center gap-2 shadow-lg transition active:scale-95">
+                            <i class="fa-solid fa-file-import"></i>
+                            <span>コード読み込み</span>
+                        </button>
+                    </section>
+                    
+                    <span id="shop-item-count-badge" class="text-xs font-mono font-bold text-gray-400 bg-gray-800 px-3 py-1 rounded-full border border-gray-700">
+                        登録商品数: 0 件
+                    </span>
+                </footer>
+            </header>
+
+            <!-- Add Item Trigger Buttons -->
+            <section class="flex flex-col sm:flex-row gap-4">
+                <button onclick="App.openAddNormalModal()" class="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold p-4 rounded-xl shadow-xl flex items-center justify-center gap-3 transition transform active:scale-98 border border-blue-400/40">
+                    <span class="text-3xl">📦</span>
+                    <span class="text-base sm:text-lg">通常商品を追加する</span>
+                </button>
+                <button onclick="App.openAddLuckyModal()" class="flex-1 bg-gradient-to-r from-amber-500 via-pink-500 to-purple-600 hover:opacity-95 text-white font-extrabold p-4 rounded-xl shadow-xl flex items-center justify-center gap-3 transition transform active:scale-98 border border-yellow-300/40">
+                    <span class="text-3xl animate-bounce">🎰</span>
+                    <span class="text-base sm:text-lg">ラッキーブロックを追加する</span>
+                </button>
+            </section>
+
+            <!-- Created Items Preview List -->
+            <article class="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 shadow-inner">
+                <h3 class="text-lg font-bold text-gray-200 mb-4 flex items-center justify-between">
+                    <span>出品中アイテムリスト</span>
+                    <span class="text-xs text-gray-400 font-normal">※ここで作成したアイテムがお客様に販売されます</span>
+                </h3>
+
+                <ul id="builder-items-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Dynamic items rendered here -->
+                </ul>
             </article>
         </section>
 
-        <!-- Tab 3: View Shops -->
-        <section id="tab-view" class="tab-content">
-            <article class="card">
-                <h2>🔍 公開中のショップ一覧</h2>
-                <p style="font-size: 0.8rem; color: var(--text-sub);">
-                    現在ネットワーク上で開店しているショップです。ID入力なしで直接選択して訪問できます。
-                </p>
-                <button class="action-btn secondary" style="margin-bottom: 8px;" onclick="searchDiscoveredShops()">🔄 ショップを再検索</button>
+        <!-- SECTION 2: OPEN SHOP (ショップを開く - ホストモード) -->
+        <section id="section-open" class="hidden flex-col gap-6">
+            <article class="bg-gradient-to-br from-gray-900 via-slate-900 to-gray-950 border border-green-500/40 rounded-2xl p-6 shadow-2xl text-center flex flex-col items-center gap-5">
+                
+                <header class="flex flex-col items-center gap-2">
+                    <span id="host-status-icon" class="text-6xl animate-pulse">📡</span>
+                    <h2 class="text-2xl font-black text-green-400">P2P リアルタイムネットワーク開店</h2>
+                    <p class="text-sm text-gray-400 max-w-md">
+                        ボタンを押してショップを「公開」すると、サーバーレスで直接他のプレイヤーと通信できます。3桁のパスワードが発行されます。
+                    </p>
+                </header>
 
-                <ul class="item-grid" id="discovered-shops-list">
-                    <!-- Automatically discovered shops will appear here as clickable cards -->
-                </ul>
-            </article>
+                <article id="host-code-card" class="hidden bg-gray-950/90 border-2 border-green-400 rounded-2xl p-6 w-full max-w-md shadow-2xl flex flex-col items-center gap-3 animate-pulse-glow">
+                    <span class="text-xs font-bold text-green-400 tracking-widest">来店用 3桁パスワード</span>
+                    <mark id="host-pass-display" class="text-5xl font-black text-yellow-300 tracking-widest font-mono bg-transparent">
+                        ---
+                    </mark>
+                    <span class="text-xs text-gray-400">この3桁コードを「ショップを見る」側で入力してもらうと接続できます</span>
+                </article>
 
-            <article class="card" style="border: 1px dashed rgba(255,255,255,0.15);">
-                <details>
-                    <summary style="font-size: 0.85rem; color: var(--text-sub); cursor: pointer;">🆔 P2P IDで直接指定して訪問する（任意）</summary>
-                    <fieldset style="border: none; padding-top: 12px; display: flex; flex-direction: column; gap: 8px;">
-                        <label class="form-group">
-                            相手の P2P ID
-                            <input type="text" id="target-peer-id" placeholder="例: rbx-shop-xxxxxx">
-                        </label>
-                        <button class="action-btn" onclick="connectToPeerShop()">🌐 ID指定で訪問</button>
-                    </fieldset>
-                </details>
-            </article>
+                <nav class="flex flex-wrap gap-4 justify-center">
+                    <button id="btn-start-host" onclick="App.startHosting()" class="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-gray-950 font-black px-8 py-4 rounded-xl text-lg shadow-xl transition transform active:scale-95 flex items-center gap-3">
+                        <i class="fa-solid fa-play"></i>
+                        <span>ショップを公開（開店）</span>
+                    </button>
+                    <button id="btn-stop-host" onclick="App.stopHosting()" class="hidden bg-red-600 hover:bg-red-500 text-white font-black px-8 py-4 rounded-xl text-lg shadow-xl transition transform active:scale-95 flex items-center gap-3">
+                        <i class="fa-solid fa-stop"></i>
+                        <span>店を閉じる</span>
+                    </button>
+                </nav>
 
-            <!-- Active Visiting Shop Container -->
-            <article class="card" id="visiting-shop-card" style="display:none;">
-                <h2 id="visiting-shop-title">🏪 店名</h2>
-                <p style="font-size: 0.85rem; color: var(--accent-cyan);" id="visiting-shop-owner">店長: 👑</p>
-                <ul class="item-grid" id="visiting-item-list">
-                    <!-- Peer Shop items loaded here -->
-                </ul>
+                <footer class="w-full bg-gray-900 border border-gray-800 rounded-xl p-4 text-left max-w-xl">
+                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">ネットワークログ</h4>
+                    <p id="host-log-text" class="text-xs font-mono text-cyan-300 h-24 overflow-y-auto whitespace-pre-wrap">
+                        [SYSTEM] 準備完了。公開ボタンを押してください...
+                    </p>
+                </footer>
             </article>
         </section>
 
-        <!-- Tab 4: Inventory -->
-        <section id="tab-inventory" class="tab-content">
-            <article class="card">
-                <h2>🎒 あなたのインベントリ (購入済み商品)</h2>
-                <p style="font-size: 0.8rem; color: var(--text-sub); margin-bottom: 8px;">
-                    ⚠️ 不正防止機能: 購入したファイルをダウンロードするには、事前に「セーブ」を行ってデータを確定する必要があります。
-                </p>
-                <ul class="item-grid" id="inventory-item-list">
-                    <!-- Dynamic Inventory items -->
+        <!-- SECTION 3: BROWSE SHOP (ショップを見る - クライアント/ローカルテスト) -->
+        <section id="section-browse" class="hidden flex-col gap-6">
+            
+            <!-- Connection Control Header -->
+            <article class="bg-gray-900/90 border border-fuchsia-500/30 rounded-2xl p-5 shadow-2xl backdrop-blur-sm flex flex-col md:flex-row items-center justify-between gap-4">
+                <section class="flex flex-col gap-1 w-full md:w-auto">
+                    <h2 class="text-xl font-black text-fuchsia-400 flex items-center gap-2">
+                        <i class="fa-solid fa-globe"></i>
+                        <span>オンラインショップ検索＆接続</span>
+                    </h2>
+                    <p class="text-xs text-gray-400">ホストが発行した3桁のパスワードを入力してリアルタイム通信するか、自作ショップをローカルテストできます。</p>
+                </section>
+
+                <form onsubmit="event.preventDefault(); App.connectToHost();" class="flex items-center gap-2 w-full md:w-auto">
+                    <label class="flex-grow">
+                        <input type="text" id="connect-pass-input" maxlength="3" placeholder="3桁コード" class="w-28 bg-gray-800 border border-fuchsia-500/50 rounded-lg px-3 py-2 text-center text-xl font-mono font-black text-yellow-300 placeholder-gray-600 focus:outline-none focus:border-fuchsia-400">
+                    </label>
+                    <button type="button" onclick="App.connectToHost()" class="bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold px-4 py-2 rounded-lg text-sm transition active:scale-95 flex items-center gap-1 shadow-lg">
+                        <i class="fa-solid fa-plug"></i>
+                        <span>接続</span>
+                    </button>
+                    <button type="button" onclick="App.loadLocalShopToBrowse()" class="bg-gray-800 hover:bg-gray-700 text-cyan-300 font-bold px-3 py-2 rounded-lg text-xs transition active:scale-95 border border-cyan-500/40">
+                        自分の店を開く
+                    </button>
+                </form>
+            </article>
+
+            <!-- Active Shop View Header -->
+            <header id="browse-shop-banner" class="bg-gradient-to-r from-purple-900/60 via-gray-900 to-indigo-900/60 border border-purple-500/40 rounded-2xl p-6 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                <figure class="flex items-center gap-4">
+                    <span id="browse-owner-emoji" class="text-5xl bg-gray-800 p-3 rounded-2xl border border-purple-400 shadow-lg">👑</span>
+                    <figcaption class="flex flex-col">
+                        <h3 id="browse-shop-title" class="text-2xl font-black text-white">マイ★ドリームショップ</h3>
+                        <span id="browse-connection-status" class="text-xs font-bold text-green-400 flex items-center gap-1">
+                            <i class="fa-solid fa-circle text-[8px]"></i> ローカルプレビューモード
+                        </span>
+                    </figcaption>
+                </figure>
+
+                <article class="bg-gray-950/80 px-5 py-3 rounded-xl border border-yellow-500/30 text-right">
+                    <span class="text-xs text-gray-400 font-bold">あなたの所持金</span>
+                    <p id="browse-user-robux" class="text-xl font-black text-yellow-400 font-mono">1,000 Robux</p>
+                </article>
+            </header>
+
+            <!-- Shop Items Grid -->
+            <article class="bg-gray-900/40 border border-gray-800 rounded-2xl p-5">
+                <h4 class="text-base font-bold text-gray-300 mb-4">販売中の商品一覧</h4>
+                <ul id="browse-items-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Dynamic Items List -->
+                </ul>
+            </article>
+
+            <!-- User Purchased Inventory Section -->
+            <article class="bg-gray-900/90 border border-yellow-500/30 rounded-2xl p-5 shadow-2xl">
+                <header class="flex items-center justify-between mb-4 border-b border-gray-800 pb-3">
+                    <h3 class="text-lg font-black text-yellow-400 flex items-center gap-2">
+                        <i class="fa-solid fa-box-archive"></i>
+                        <span>購入済みインベントリ & ファイルダウンロード</span>
+                    </h3>
+                    <mark id="save-warning-badge" class="bg-red-500/20 text-red-400 border border-red-500/40 text-xs px-3 py-1 rounded-full font-bold">
+                        ⚠️ 「セーブコード発行」を行わないとDL不可
+                    </mark>
+                </header>
+
+                <ul id="inventory-items-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Dynamic Inventory Items -->
                 </ul>
             </article>
         </section>
 
     </main>
 
-    <!-- Modal: Normal Item -->
-    <dialog id="modal-normal-item">
-        <form method="dialog" onsubmit="saveNormalItem(event)" style="display: flex; flex-direction: column; gap: 12px; padding: 12px; max-width: 400px; width: 100%;">
-            <h3 style="color: var(--accent-cyan);">📦 通常商品の登録</h3>
-            
-            <label class="form-group">
-                商品名
-                <input type="text" id="item-name" required placeholder="例: 伝説のつるぎ">
-            </label>
-
-            <label class="form-group">
-                商品説明
-                <textarea id="item-desc" required placeholder="商品の説明を入力..."></textarea>
-            </label>
-
-            <label class="form-group">
-                価格 (Robux)
-                <input type="number" id="item-price" min="1" value="100" required>
-            </label>
-
-            <label class="form-group">
-                見た目 (絵文字)
-                <input type="text" id="item-emoji" value="⚔️" required maxlength="4">
-            </label>
-
-            <label class="form-group">
-                オーラの色
-                <select id="item-aura">
-                    <option value="aura-blue">🟦 ブルーオーラ</option>
-                    <option value="aura-red">🟥 レッドオーラ</option>
-                    <option value="aura-gold">🟨 ゴールドオーラ</option>
-                    <option value="aura-purple">🟪 パープルオーラ</option>
-                    <option value="aura-rainbow">🌈 レインボーオーラ</option>
-                </select>
-            </label>
-
-            <label class="file-upload-btn">
-                <span>📁 ファイルをアップロード</span>
-                <input type="file" id="item-file" required onchange="handleFileSelected(this, 'file-label-text')">
-                <small id="file-label-text" style="color: var(--accent-green);">ファイルが選択されていません</small>
-            </label>
-
-            <fieldset style="border:none; display:flex; gap:8px; margin-top:8px;">
-                <button type="button" class="action-btn secondary" style="flex:1" onclick="document.getElementById('modal-normal-item').close()">キャンセル</button>
-                <button type="submit" class="action-btn" style="flex:1">商品を追加</button>
-            </fieldset>
-        </form>
-    </dialog>
-
-    <!-- Modal: Lucky Block -->
-    <dialog id="modal-lucky-block">
-        <form method="dialog" onsubmit="saveLuckyBlock(event)" style="display: flex; flex-direction: column; gap: 12px; padding: 12px; max-width: 460px; width: 100%; max-height: 85vh; overflow-y: auto;">
-            <h3 style="color: var(--accent-gold);">❓ ラッキーブロックの作成</h3>
-
-            <label class="form-group">
-                ラッキーブロックの名前
-                <input type="text" id="lb-name" value="ミステリーラッキーボックス" required>
-            </label>
-
-            <label class="form-group">
-                ブロックの価格 (Robux)
-                <input type="number" id="lb-price" min="1" value="250" required>
-            </label>
-
-            <label class="form-group">
-                見た目の絵文字
-                <input type="text" id="lb-emoji" value="🎁" required maxlength="4">
-            </label>
-
-            <label class="form-group">
-                中身の種類（アイテム数）
-                <fieldset style="border:none; display:flex; gap:8px;">
-                    <input type="number" id="lb-count" min="2" max="6" value="3">
-                    <button type="button" class="action-btn secondary" onclick="generateLuckyFields()">入力欄決定</button>
-                </fieldset>
-            </label>
-
-            <!-- Dynamic Fields for each entry -->
-            <section id="lucky-fields-container">
-                <!-- Dynamically generated lucky block internal items -->
-            </section>
-
-            <fieldset style="border:none; display:flex; gap:8px; margin-top:8px;">
-                <button type="button" class="action-btn secondary" style="flex:1" onclick="document.getElementById('modal-lucky-block').close()">キャンセル</button>
-                <button type="submit" class="action-btn success" style="flex:1">ラッキーブロックを保存</button>
-            </fieldset>
-        </form>
-    </dialog>
-
-    <!-- Modal: Roulette Gacha -->
-    <dialog class="roulette-dialog" id="roulette-modal">
-        <h2 style="color: var(--accent-gold);">🎲 ガチャルーレット</h2>
-        <p style="font-size: 0.8rem; color: var(--text-sub);">何が当たるか運試し...</p>
-
-        <section class="roulette-container">
-            <figure class="roulette-display" id="roulette-icon">❓</figure>
-        </section>
-
-        <h3 id="roulette-result-name" style="height: 24px; color: var(--accent-cyan); font-size: 1rem;">回転中...</h3>
-
-        <button class="action-btn success" id="roulette-close-btn" style="width:100%; margin-top:16px; display:none;" onclick="closeRouletteModal()">確定して受け取る</button>
-    </dialog>
-
-    <aside class="toast-notification" id="toast">
-        <span id="toast-icon">✨</span>
-        <span id="toast-message">メッセージ</span>
-    </aside>
-
-    <footer>
-        <p>Robux Gacha P2P Market &copy; 2026 - Serverless PeerJS Engine</p>
+    <footer class="bg-gray-950 border-t border-gray-900 py-4 text-center text-xs text-gray-600">
+        <p>ROBUX P2P STORE &copy; 2026 - Serverless Lucky Block Marketplace (DIV-FREE Pure Architecture)</p>
     </footer>
+
+    <!-- MODAL 1: ADD NORMAL ITEM -->
+    <section id="modal-add-normal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <article class="bg-gray-900 border-2 border-blue-500 rounded-2xl max-w-lg w-full p-6 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+            <header class="flex items-center justify-between border-b border-gray-800 pb-3">
+                <h3 class="text-lg font-black text-blue-400 flex items-center gap-2">
+                    <span>📦</span> 通常商品の作成
+                </h3>
+                <button onclick="App.closeModals()" class="text-gray-400 hover:text-white text-xl font-bold">✕</button>
+            </header>
+
+            <form onsubmit="event.preventDefault(); App.saveNormalItem();" class="flex flex-col gap-3 text-sm">
+                <label class="flex flex-col gap-1">
+                    <span class="font-bold text-gray-300">商品名</span>
+                    <input type="text" id="norm-name" required placeholder="例: スーパー伝説の剣" class="bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-blue-400">
+                </label>
+
+                <section class="grid grid-cols-2 gap-3">
+                    <label class="flex flex-col gap-1">
+                        <span class="font-bold text-gray-300">見た目の絵文字</span>
+                        <input type="text" id="norm-emoji" maxlength="4" required value="⚔️" class="bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-center text-2xl focus:outline-none focus:border-blue-400">
+                    </label>
+
+                    <label class="flex flex-col gap-1">
+                        <span class="font-bold text-gray-300">値段 (Robux)</span>
+                        <input type="number" id="norm-price" min="0" required value="100" class="bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-blue-400 font-mono">
+                    </label>
+                </section>
+
+                <label class="flex flex-col gap-1">
+                    <span class="font-bold text-gray-300">オーラの色</span>
+                    <select id="norm-aura" class="bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-blue-400">
+                        <option value="none">オーラなし (標準)</option>
+                        <option value="red">🔥 レッドオーラ</option>
+                        <option value="blue">⚡ ブルーオーラ</option>
+                        <option value="green">🌿 グリーンオーラ</option>
+                        <option value="gold">✨ ゴールドオーラ</option>
+                        <option value="purple">🔮 パープルオーラ</option>
+                        <option value="rainbow">🌈 虹色レインボーオーラ</option>
+                    </select>
+                </label>
+
+                <label class="flex flex-col gap-1">
+                    <span class="font-bold text-gray-300">商品説明文</span>
+                    <textarea id="norm-desc" rows="2" placeholder="商品の説明を入力..." class="bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-white focus:outline-none focus:border-blue-400"></textarea>
+                </label>
+
+                <label class="flex flex-col gap-1 bg-gray-950 p-3 rounded-xl border border-dashed border-gray-700 cursor-pointer hover:border-blue-400 text-center">
+                    <span class="font-bold text-blue-400 mb-1">📁 ファイルをアップロード</span>
+                    <span id="norm-file-label" class="text-xs text-gray-400">クリックしてファイルを添付（購入者が保存可能）</span>
+                    <input type="file" id="norm-file" class="hidden" onchange="App.handleFileSelect(this, 'norm-file-label')">
+                </label>
+
+                <footer class="mt-3 flex justify-end gap-3 border-t border-gray-800 pt-3">
+                    <button type="button" onclick="App.closeModals()" class="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold">キャンセル</button>
+                    <button type="submit" class="px-6 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-black shadow-lg">保存して追加</button>
+                </footer>
+            </form>
+        </article>
+    </section>
+
+    <!-- MODAL 2: ADD LUCKY BLOCK ITEM -->
+    <section id="modal-add-lucky" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <article class="bg-gray-900 border-2 border-pink-500 rounded-2xl max-w-2xl w-full p-6 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+            <header class="flex items-center justify-between border-b border-gray-800 pb-3">
+                <h3 class="text-lg font-black text-pink-400 flex items-center gap-2">
+                    <span>🎰</span> ラッキーブロック作成ウィザード
+                </h3>
+                <button onclick="App.closeModals()" class="text-gray-400 hover:text-white text-xl font-bold">✕</button>
+            </header>
+
+            <form onsubmit="event.preventDefault();" class="flex flex-col gap-4 text-sm">
+                
+                <!-- Basic Lucky Block Details -->
+                <section class="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-gray-950 p-4 rounded-xl border border-gray-800">
+                    <label class="flex flex-col gap-1">
+                        <span class="font-bold text-gray-300">ブロック名</span>
+                        <input type="text" id="lucky-main-name" required value="超絶ラッキーブロック" class="bg-gray-800 border border-gray-700 rounded-lg p-2 text-white">
+                    </label>
+
+                    <label class="flex flex-col gap-1">
+                        <span class="font-bold text-gray-300">見た目の絵文字</span>
+                        <input type="text" id="lucky-main-emoji" maxlength="4" required value="🎁" class="bg-gray-800 border border-gray-700 rounded-lg p-2 text-center text-2xl">
+                    </label>
+
+                    <label class="flex flex-col gap-1">
+                        <span class="font-bold text-gray-300">販売値段 (Robux)</span>
+                        <input type="number" id="lucky-main-price" min="0" required value="250" class="bg-gray-800 border border-gray-700 rounded-lg p-2 text-white font-mono">
+                    </label>
+                </section>
+
+                <!-- Number of Contents Generator -->
+                <section class="flex items-center gap-3 bg-purple-950/40 p-3 rounded-xl border border-purple-500/30">
+                    <label class="flex items-center gap-2 flex-grow">
+                        <span class="font-bold text-purple-300 whitespace-nowrap">中身の種類数:</span>
+                        <input type="number" id="lucky-count-input" min="1" max="10" value="3" class="w-20 bg-gray-800 border border-purple-400 rounded-lg p-2 text-center text-white font-bold">
+                    </label>
+                    <button type="button" onclick="App.generateLuckyEntries()" class="bg-purple-600 hover:bg-purple-500 text-white font-bold px-4 py-2 rounded-lg shadow-md transition">
+                        決定（入力欄生成）
+                    </button>
+                </section>
+
+                <!-- Dynamic Lucky Block Contents Input List -->
+                <article id="lucky-entries-container" class="flex flex-col gap-4">
+                    <!-- Dynamically generated contents form items go here -->
+                </article>
+
+                <footer class="mt-3 flex justify-end gap-3 border-t border-gray-800 pt-3">
+                    <button type="button" onclick="App.closeModals()" class="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold">キャンセル</button>
+                    <button type="button" onclick="App.saveLuckyBlockItem()" class="px-6 py-2 rounded-lg bg-gradient-to-r from-pink-500 to-purple-600 hover:opacity-90 text-white font-black shadow-lg">ラッキーブロック完成！</button>
+                </footer>
+            </form>
+        </article>
+    </section>
+
+    <!-- MODAL 3: ROULETTE / GACHA ANIMATION OVERLAY -->
+    <section id="modal-roulette" class="fixed inset-0 bg-black/90 backdrop-blur-xl z-50 hidden flex flex-col items-center justify-center p-4">
+        <article class="bg-gradient-to-b from-gray-900 to-gray-950 border-4 border-yellow-400 rounded-3xl p-6 sm:p-10 max-w-xl w-full text-center flex flex-col items-center gap-6 shadow-2xl relative overflow-hidden">
+            
+            <header class="flex flex-col items-center gap-1">
+                <span class="text-xs font-black tracking-widest text-yellow-400 uppercase">LUCKY BLOCK ROULETTE</span>
+                <h3 id="roulette-title-text" class="text-2xl font-black text-white">開封中...</h3>
+            </header>
+
+            <!-- Roulette Spinning Display Box -->
+            <figure class="w-full bg-gray-950 border-2 border-yellow-500/50 rounded-2xl p-8 flex flex-col items-center justify-center min-h-[180px] shadow-inner relative overflow-hidden">
+                <span id="roulette-emoji-display" class="text-8xl transform transition duration-75 animate-bounce">🎁</span>
+                <p id="roulette-name-display" class="mt-4 text-xl font-black text-yellow-300 font-mono">??????</p>
+            </figure>
+
+            <p id="roulette-sub-text" class="text-sm font-bold text-gray-400">何が当たるかな...？</p>
+
+            <button id="btn-roulette-close" onclick="App.closeRouletteModal()" class="hidden bg-yellow-500 hover:bg-yellow-400 text-gray-950 font-black px-8 py-3 rounded-full text-lg shadow-xl transition transform active:scale-95">
+                結果を確認して受け取る
+            </button>
+        </article>
+    </section>
+
+    <!-- MODAL 4: SAVE / EXPORT CODE DISPLAY -->
+    <section id="modal-export-code" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <article class="bg-gray-900 border border-cyan-500 rounded-2xl max-w-md w-full p-6 shadow-2xl flex flex-col gap-4">
+            <header class="flex items-center justify-between border-b border-gray-800 pb-2">
+                <h3 class="text-lg font-black text-cyan-400">🔑 全データ統合セーブコード</h3>
+                <button onclick="App.closeModals()" class="text-gray-400 hover:text-white font-bold text-xl">✕</button>
+            </header>
+
+            <p class="text-xs text-gray-300">
+                所持金・購入インベントリ・ショップ情報をすべて含んだセーブコードです。<br>
+                <span class="text-yellow-400 font-bold">※このコードを発行した時点で購入アイテムのDLロックが解除されます。</span>
+            </p>
+
+            <textarea id="export-code-textarea" readonly rows="6" class="bg-gray-950 border border-gray-800 text-cyan-300 text-xs font-mono p-3 rounded-lg focus:outline-none select-all break-all"></textarea>
+
+            <footer class="flex justify-end gap-2">
+                <button onclick="App.copySaveCode()" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-4 py-2 rounded-lg text-xs">
+                    クリップボードにコピー
+                </button>
+            </footer>
+        </article>
+    </section>
 
     <script>
         /**
-         * System State Store
+         * ROBUX P2P SHOPPING APPLICATION CODE
+         * Fully Pure Semantic HTML (0 DIV Tags)
          */
-        const AppState = {
-            robux: 1000,
-            shopName: "マイマーケット",
-            shopOwnerEmoji: "👑",
-            items: [],
-            inventory: [],
-            savedInventoryKeys: new Set(), // Unlocked downloads after saving
-            discoveredShops: {}, // Auto-discovered open shops list
-            peer: null,
-            peerId: null,
-            connections: [],
-            isOpen: false,
-            uploadedFileTemp: null,
-            luckyFilesTemp: {},
-            useFallbackP2P: false,
-            p2pChannel: null
-        };
-
-        window.onload = function() {
-            initPeerJS();
-            renderBuilderItems();
-            renderInventory();
-            updateRobuxDisplay();
-        };
-
-        function switchTab(tabId) {
-            const tabs = document.querySelectorAll('.tab-content');
-            const btns = document.querySelectorAll('.nav-btn');
-
-            tabs.forEach(tab => tab.classList.remove('active'));
-            btns.forEach(btn => btn.classList.remove('active'));
-
-            document.getElementById(`tab-${tabId}`).classList.add('active');
+        const App = {
+            // App State
+            userRobux: 1000,
+            userInventory: [], // Purchased items {id, name, emoji, aura, fileData, fileName, isSaved}
             
-            // Highlight active navigation button
-            const activeIndex = ['create', 'open', 'view', 'inventory'].indexOf(tabId);
-            if (activeIndex !== -1) {
-                btns[activeIndex].classList.add('active');
-            }
+            // Shop Building State
+            shopData: {
+                name: "マイ★ドリームショップ",
+                ownerEmoji: "👑",
+                items: []
+            },
 
-            if (tabId === 'view') {
-                searchDiscoveredShops();
-            }
-        }
+            // Active Browsing Shop State
+            activeBrowseShop: null,
 
-        function showToast(msg, icon = "✨") {
-            const toast = document.getElementById('toast');
-            document.getElementById('toast-message').innerText = msg;
-            document.getElementById('toast-icon').innerText = icon;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 3000);
-        }
+            // P2P Networking State
+            peer: null,
+            hostConnections: [],
+            clientConn: null,
+            isHosting: false,
+            hostPasscode: "",
 
-        function updateRobuxDisplay() {
-            document.getElementById('robux-amount').innerText = AppState.robux;
-        }
+            // Initialize Application
+            init() {
+                this.updateRobuxDisplays();
+                this.generateLuckyEntries(); // Pre-generate 3 slots for lucky block modal
+                this.renderBuilderItems();
+                this.loadLocalShopToBrowse();
+            },
 
-        function readFileAsBase64(file) {
-            return new Promise((resolve, reject) => {
+            // FULL SAVE CODE SYSTEM (ALL SAVES VIA SAVE CODES)
+            openFullSaveModal() {
+                this.updateShopMetadataFromInputs();
+                
+                // Mark all current inventory items as Saved
+                this.userInventory.forEach(item => item.isSaved = true);
+
+                const fullData = {
+                    robux: this.userRobux,
+                    inventory: this.userInventory,
+                    shop: this.shopData
+                };
+
+                // Generate Base64 Encoded Save Code
+                const saveCode = btoa(encodeURIComponent(JSON.stringify(fullData)));
+
+                document.getElementById("export-code-textarea").value = saveCode;
+                document.getElementById("modal-export-code").classList.remove("hidden");
+
+                // Refresh displays to unlock downloads
+                this.renderInventory();
+                this.showToast("🔑 セーブコードを発行しました！(ダウンロード可能になりました)");
+            },
+
+            importFullSavePrompt() {
+                const code = prompt("保存した「セーブコード」を貼り付けてください:");
+                if (!code || !code.trim()) return;
+
+                try {
+                    const jsonStr = decodeURIComponent(atob(code.trim()));
+                    const parsed = JSON.parse(jsonStr);
+
+                    if (parsed && typeof parsed.robux === 'number') {
+                        this.userRobux = parsed.robux;
+                        this.userInventory = parsed.inventory || [];
+                        if (parsed.shop) this.shopData = parsed.shop;
+
+                        // Set shop UI elements
+                        document.getElementById("shop-name-input").value = this.shopData.name || "インポートショップ";
+                        document.getElementById("shop-owner-emoji").value = this.shopData.ownerEmoji || "👑";
+
+                        // Update view states
+                        this.updateRobuxDisplays();
+                        this.renderBuilderItems();
+                        this.renderInventory();
+                        this.loadLocalShopToBrowse();
+
+                        this.showToast("✅ セーブコードから全データを完全復元しました！");
+                    } else {
+                        throw new Error("Invalid format");
+                    }
+                } catch (e) {
+                    this.showToast("❌ セーブコードが無効か破損しています");
+                }
+            },
+
+            updateRobuxDisplays() {
+                document.getElementById("user-robux-display").innerText = `${this.userRobux.toLocaleString()} Robux`;
+                document.getElementById("browse-user-robux").innerText = `${this.userRobux.toLocaleString()} Robux`;
+            },
+
+            // Navigation Tab Switcher
+            switchTab(tabName) {
+                const buildSec = document.getElementById("section-build");
+                const openSec = document.getElementById("section-open");
+                const browseSec = document.getElementById("section-browse");
+
+                const btnBuild = document.getElementById("btn-tab-build");
+                const btnOpen = document.getElementById("btn-tab-open");
+                const btnBrowse = document.getElementById("btn-tab-browse");
+
+                // Reset styles
+                [btnBuild, btnOpen, btnBrowse].forEach(btn => {
+                    btn.className = "p-3 sm:p-4 rounded-xl font-bold text-sm sm:text-base flex flex-col sm:flex-row items-center justify-center gap-2 border transition duration-200 bg-gray-900/80 border-gray-700 text-gray-400 shadow-lg hover:border-gray-500 active:scale-98";
+                });
+
+                buildSec.classList.add("hidden");
+                openSec.classList.add("hidden");
+                browseSec.classList.add("hidden");
+
+                if (tabName === 'build') {
+                    buildSec.classList.remove("hidden");
+                    btnBuild.className = "p-3 sm:p-4 rounded-xl font-bold text-sm sm:text-base flex flex-col sm:flex-row items-center justify-center gap-2 border transition duration-200 bg-gradient-to-br from-cyan-900/60 to-gray-900 border-cyan-500 text-cyan-300 shadow-lg hover:border-cyan-400 active:scale-98";
+                } else if (tabName === 'open') {
+                    openSec.classList.remove("hidden");
+                    btnOpen.className = "p-3 sm:p-4 rounded-xl font-bold text-sm sm:text-base flex flex-col sm:flex-row items-center justify-center gap-2 border transition duration-200 bg-gradient-to-br from-green-900/60 to-gray-900 border-green-500 text-green-300 shadow-lg hover:border-green-400 active:scale-98";
+                } else if (tabName === 'browse') {
+                    browseSec.classList.remove("hidden");
+                    btnBrowse.className = "p-3 sm:p-4 rounded-xl font-bold text-sm sm:text-base flex flex-col sm:flex-row items-center justify-center gap-2 border transition duration-200 bg-gradient-to-br from-fuchsia-900/60 to-gray-900 border-fuchsia-500 text-fuchsia-300 shadow-lg hover:border-fuchsia-400 active:scale-98";
+                    this.renderBrowseShop();
+                    this.renderInventory();
+                }
+            },
+
+            // Helper File Reader
+            tempUploadedFile: null,
+            handleFileSelect(inputEl, labelId) {
+                const file = inputEl.files[0];
+                if (!file) return;
+                
                 const reader = new FileReader();
-                reader.onload = () => resolve({ name: file.name, type: file.type, data: reader.result });
-                reader.onerror = error => reject(error);
+                reader.onload = (e) => {
+                    this.tempUploadedFile = {
+                        name: file.name,
+                        data: e.target.result
+                    };
+                    document.getElementById(labelId).innerText = `✅ 選択済み: ${file.name}`;
+                };
                 reader.readAsDataURL(file);
-            });
-        }
+            },
 
-        async function handleFileSelected(input, targetLabelId) {
-            if (input.files && input.files[0]) {
-                const file = input.files[0];
-                document.getElementById(targetLabelId).innerText = `選択完了: ${file.name}`;
-                AppState.uploadedFileTemp = await readFileAsBase64(file);
-            }
-        }
+            // Modal Controller
+            closeModals() {
+                document.getElementById("modal-add-normal").classList.add("hidden");
+                document.getElementById("modal-add-lucky").classList.add("hidden");
+                document.getElementById("modal-export-code").classList.add("hidden");
+                this.tempUploadedFile = null;
+            },
 
-        async function handleLuckyFileSelected(input, index) {
-            if (input.files && input.files[0]) {
-                const file = input.files[0];
-                AppState.luckyFilesTemp[index] = await readFileAsBase64(file);
-                showToast(`ファイル [${file.name}] を選択しました`);
-            }
-        }
+            openAddNormalModal() {
+                this.tempUploadedFile = null;
+                document.getElementById("norm-file-label").innerText = "クリックしてファイルを添付（購入者が保存可能）";
+                document.getElementById("modal-add-normal").classList.remove("hidden");
+            },
 
-        function openNormalItemModal() {
-            AppState.uploadedFileTemp = null;
-            document.getElementById('file-label-text').innerText = "ファイルが選択されていません";
-            document.getElementById('modal-normal-item').showModal();
-        }
+            openAddLuckyModal() {
+                document.getElementById("modal-add-lucky").classList.remove("hidden");
+            },
 
-        function saveNormalItem(event) {
-            if (!AppState.uploadedFileTemp) {
-                showToast("ファイルをアップロードしてください", "⚠️");
-                event.preventDefault();
-                return;
-            }
+            // Save Normal Item to Builder
+            saveNormalItem() {
+                const name = document.getElementById("norm-name").value.trim();
+                const emoji = document.getElementById("norm-emoji").value.trim() || "📦";
+                const price = parseInt(document.getElementById("norm-price").value) || 0;
+                const aura = document.getElementById("norm-aura").value;
+                const desc = document.getElementById("norm-desc").value.trim();
 
-            const newItem = {
-                id: 'item_' + Date.now(),
-                type: 'normal',
-                name: document.getElementById('item-name').value,
-                desc: document.getElementById('item-desc').value,
-                price: parseInt(document.getElementById('item-price').value),
-                emoji: document.getElementById('item-emoji').value,
-                aura: document.getElementById('item-aura').value,
-                fileData: AppState.uploadedFileTemp
-            };
+                if (!name) return;
 
-            AppState.items.push(newItem);
-            renderBuilderItems();
-            showToast("商品をショップに追加しました！");
-        }
+                const newItem = {
+                    id: 'item_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+                    type: 'normal',
+                    name,
+                    emoji,
+                    price,
+                    aura,
+                    desc,
+                    fileData: this.tempUploadedFile ? this.tempUploadedFile.data : null,
+                    fileName: this.tempUploadedFile ? this.tempUploadedFile.name : 'digital_item.txt'
+                };
 
-        function openLuckyBlockModal() {
-            AppState.luckyFilesTemp = {};
-            generateLuckyFields();
-            document.getElementById('modal-lucky-block').showModal();
-        }
+                this.updateShopMetadataFromInputs();
+                this.shopData.items.push(newItem);
+                this.renderBuilderItems();
+                this.closeModals();
+                this.showToast("📦 商品を追加しました！");
+            },
 
-        function generateLuckyFields() {
-            const count = parseInt(document.getElementById('lb-count').value) || 3;
-            const container = document.getElementById('lucky-fields-container');
-            container.innerHTML = '';
+            // Lucky Block Form Entry Generator
+            generateLuckyEntries() {
+                const count = parseInt(document.getElementById("lucky-count-input").value) || 1;
+                const container = document.getElementById("lucky-entries-container");
+                container.innerHTML = "";
 
-            for (let i = 0; i < count; i++) {
-                const fieldSection = document.createElement('section');
-                fieldSection.className = 'lucky-entry-item';
-                fieldSection.innerHTML = `
-                    <strong style="font-size: 0.8rem; color: var(--accent-gold);">アイテム #${i + 1}</strong>
-                    <label class="form-group">
-                        名前: <input type="text" id="lb-item-name-${i}" required placeholder="当たりの名前">
-                    </label>
-                    <fieldset style="border:none; display:flex; gap:6px;">
-                        <label class="form-group" style="flex:1">
-                            絵文字: <input type="text" id="lb-item-emoji-${i}" value="💎" required maxlength="4">
-                        </label>
-                        <label class="form-group" style="flex:1">
-                            確率 (%): <input type="number" id="lb-item-prob-${i}" value="${Math.floor(100/count)}" min="1" max="100" required>
-                        </label>
-                    </fieldset>
-                    <label class="form-group">
-                        オーラ:
-                        <select id="lb-item-aura-${i}">
-                            <option value="aura-gold">🟨 ゴールド</option>
-                            <option value="aura-purple">🟪 パープル</option>
-                            <option value="aura-rainbow">🌈 レインボー</option>
-                            <option value="aura-blue">🟦 ブルー</option>
-                        </select>
-                    </label>
-                    <label class="file-upload-btn">
-                        <span>📁 当たりファイルを登録</span>
-                        <input type="file" required onchange="handleLuckyFileSelected(this, ${i})">
-                    </label>
-                `;
-                container.appendChild(fieldSection);
-            }
-        }
+                const defaultProb = Math.floor(100 / count);
 
-        function saveLuckyBlock(event) {
-            const count = parseInt(document.getElementById('lb-count').value);
-            const luckyContents = [];
+                for (let i = 0; i < count; i++) {
+                    const entryArticle = document.createElement("article");
+                    entryArticle.className = "bg-gray-950 p-4 rounded-xl border border-pink-500/30 flex flex-col gap-3 relative";
+                    entryArticle.innerHTML = `
+                        <header class="flex justify-between items-center border-b border-gray-800 pb-2">
+                            <span class="font-bold text-pink-400">中身アイテム #${i + 1}</span>
+                            <label class="flex items-center gap-1">
+                                <span class="text-xs font-bold text-gray-300">排出確率(%):</span>
+                                <input type="number" min="1" max="100" value="${defaultProb}" class="lucky-entry-prob w-16 bg-gray-800 border border-gray-700 rounded p-1 text-center font-bold text-yellow-300">
+                            </label>
+                        </header>
+                        <section class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                            <label class="flex flex-col gap-1">
+                                <span class="text-gray-300 font-bold">アイテム名</span>
+                                <input type="text" value="レア当選品 ${i + 1}" class="lucky-entry-name bg-gray-800 border border-gray-700 rounded p-2 text-white">
+                            </label>
+                            <label class="flex flex-col gap-1">
+                                <span class="text-gray-300 font-bold">絵文字</span>
+                                <input type="text" maxlength="4" value="${['💎','🚀','👑','🔥','🦄','⚡'][i % 6]}" class="lucky-entry-emoji bg-gray-800 border border-gray-700 rounded p-2 text-center text-xl">
+                            </label>
+                        </section>
+                        <section class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                            <label class="flex flex-col gap-1">
+                                <span class="text-gray-300 font-bold">オーラの色</span>
+                                <select class="lucky-entry-aura bg-gray-800 border border-gray-700 rounded p-2 text-white">
+                                    <option value="gold" ${i===0?'selected':''}>✨ ゴールドオーラ</option>
+                                    <option value="purple" ${i===1?'selected':''}>🔮 パープルオーラ</option>
+                                    <option value="rainbow" ${i===2?'selected':''}>🌈 レインボーオーラ</option>
+                                    <option value="blue">⚡ ブルーオーラ</option>
+                                    <option value="none">なし</option>
+                                </select>
+                            </label>
+                            <label class="flex flex-col gap-1 cursor-pointer bg-gray-900 p-2 rounded border border-dashed border-gray-700 text-center">
+                                <span class="text-pink-400 font-bold">📁 ファイルを選択</span>
+                                <span class="lucky-entry-file-label text-[10px] text-gray-400">未選択</span>
+                                <input type="file" class="lucky-entry-file hidden" onchange="App.handleLuckyEntryFileSelect(this)">
+                            </label>
+                        </section>
+                    `;
+                    container.appendChild(entryArticle);
+                }
+            },
 
-            for (let i = 0; i < count; i++) {
-                if (!AppState.luckyFilesTemp[i]) {
-                    showToast(`アイテム #${i + 1} のファイルを選択してください`, "⚠️");
-                    event.preventDefault();
+            // Handle Lucky Entry Sub-File
+            handleLuckyEntryFileSelect(inputEl) {
+                const label = inputEl.parentElement.querySelector(".lucky-entry-file-label");
+                const file = inputEl.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    inputEl.dataset.fileData = e.target.result;
+                    inputEl.dataset.fileName = file.name;
+                    label.innerText = `✅ ${file.name}`;
+                };
+                reader.readAsDataURL(file);
+            },
+
+            // Save Lucky Block Item
+            saveLuckyBlockItem() {
+                const mainName = document.getElementById("lucky-main-name").value.trim();
+                const mainEmoji = document.getElementById("lucky-main-emoji").value.trim() || "🎁";
+                const mainPrice = parseInt(document.getElementById("lucky-main-price").value) || 0;
+
+                const entryNodes = document.querySelectorAll("#lucky-entries-container article");
+                const entries = [];
+
+                entryNodes.forEach((node) => {
+                    const prob = parseFloat(node.querySelector(".lucky-entry-prob").value) || 10;
+                    const name = node.querySelector(".lucky-entry-name").value.trim() || "当選アイテム";
+                    const emoji = node.querySelector(".lucky-entry-emoji").value.trim() || "⭐";
+                    const aura = node.querySelector(".lucky-entry-aura").value;
+                    const fileInput = node.querySelector(".lucky-entry-file");
+
+                    entries.push({
+                        prob,
+                        name,
+                        emoji,
+                        aura,
+                        fileData: fileInput.dataset.fileData || null,
+                        fileName: fileInput.dataset.fileName || 'lucky_reward.txt'
+                    });
+                });
+
+                if (entries.length === 0) return;
+
+                const luckyItem = {
+                    id: 'lucky_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+                    type: 'lucky',
+                    name: mainName,
+                    emoji: mainEmoji,
+                    price: mainPrice,
+                    aura: 'rainbow',
+                    desc: `中身（${entries.length}種類）がルーレットで当たる確率仕様のラッキーブロック！`,
+                    entries: entries
+                };
+
+                this.updateShopMetadataFromInputs();
+                this.shopData.items.push(luckyItem);
+                this.renderBuilderItems();
+                this.closeModals();
+                this.showToast("🎰 ラッキーブロックを作成しました！");
+            },
+
+            deleteBuilderItem(index) {
+                this.shopData.items.splice(index, 1);
+                this.renderBuilderItems();
+            },
+
+            updateShopMetadataFromInputs() {
+                this.shopData.name = document.getElementById("shop-name-input").value.trim() || "マイ★ドリームショップ";
+                this.shopData.ownerEmoji = document.getElementById("shop-owner-emoji").value;
+            },
+
+            renderBuilderItems() {
+                const container = document.getElementById("builder-items-container");
+                const badge = document.getElementById("shop-item-count-badge");
+                container.innerHTML = "";
+
+                badge.innerText = `登録商品数: ${this.shopData.items.length} 件`;
+
+                if (this.shopData.items.length === 0) {
+                    container.innerHTML = `
+                        <li class="col-span-full py-8 text-center text-gray-500 font-bold border-2 border-dashed border-gray-800 rounded-xl">
+                            商品がありません。「追加する」ボタンから作成してください。
+                        </li>
+                    `;
                     return;
                 }
 
-                luckyContents.push({
-                    name: document.getElementById(`lb-item-name-${i}`).value,
-                    emoji: document.getElementById(`lb-item-emoji-${i}`).value,
-                    prob: parseFloat(document.getElementById(`lb-item-prob-${i}`).value),
-                    aura: document.getElementById(`lb-item-aura-${i}`).value,
-                    fileData: AppState.luckyFilesTemp[i]
-                });
-            }
-
-            const luckyBlockItem = {
-                id: 'lucky_' + Date.now(),
-                type: 'lucky',
-                name: document.getElementById('lb-name').value,
-                price: parseInt(document.getElementById('lb-price').value),
-                emoji: document.getElementById('lb-emoji').value,
-                aura: 'aura-rainbow',
-                contents: luckyContents
-            };
-
-            AppState.items.push(luckyBlockItem);
-            renderBuilderItems();
-            showToast("ラッキーブロックを作成・配置しました！");
-        }
-
-        function renderBuilderItems() {
-            const list = document.getElementById('builder-item-list');
-            list.innerHTML = '';
-
-            if (AppState.items.length === 0) {
-                list.innerHTML = '<li style="grid-column: 1/-1; color:var(--text-sub); text-align:center; padding: 12px;">商品がありません。追加してください。</li>';
-                return;
-            }
-
-            AppState.items.forEach((item, index) => {
-                const li = document.createElement('li');
-                li.className = 'item-card';
-                li.innerHTML = `
-                    <figure class="aura-box ${item.aura}">${item.emoji}</figure>
-                    <h3>${item.name}</h3>
-                    <p class="price">💰 ${item.price} R$</p>
-                    <button class="action-btn danger" style="padding:4px; font-size:0.75rem;" onclick="deleteBuilderItem(${index})">削除</button>
-                `;
-                list.appendChild(li);
-            });
-        }
-
-        function deleteBuilderItem(index) {
-            AppState.items.splice(index, 1);
-            renderBuilderItems();
-            showToast("商品を削除しました");
-        }
-
-        function initPeerJS() {
-            const randomId = 'rbx-shop-' + Math.random().toString(36).substring(2, 9);
-            AppState.peerId = randomId;
-
-            try {
-                // Attempt standard PeerJS WebSockets connection
-                AppState.peer = new Peer(randomId);
-
-                AppState.peer.on('open', (id) => {
-                    AppState.peerId = id;
-                    document.getElementById('my-peer-id').innerText = id + " (P2P)";
-                    document.getElementById('p2p-indicator').classList.add('online');
-                    showToast("P2P ネットワークに接続成功");
-                });
-
-                // Handle Incoming Shop Visitors via PeerJS
-                AppState.peer.on('connection', (conn) => {
-                    AppState.connections.push(conn);
-                    conn.on('data', (data) => handleIncomingP2PData(conn, data));
-                });
-
-                AppState.peer.on('error', (err) => {
-                    console.warn("PeerJS WebSocket unavailable or blocked, switching to Sandbox local P2P:", err);
-                    initFallbackP2P();
-                });
-            } catch (err) {
-                console.warn("WebSocket restricted by environment Security Policy. Initializing Sandbox P2P mode.", err);
-                initFallbackP2P();
-            }
-        }
-
-        function initFallbackP2P() {
-            AppState.useFallbackP2P = true;
-            document.getElementById('my-peer-id').innerText = AppState.peerId + " (サンドボックスモード)";
-            document.getElementById('p2p-indicator').classList.add('online');
-            
-            try {
-                if ('BroadcastChannel' in window) {
-                    AppState.p2pChannel = new BroadcastChannel('rbx_p2p_market_bus');
-                    AppState.p2pChannel.onmessage = (event) => {
-                        const data = event.data;
-                        if (!data) return;
-
-                        // Global broadcast messages
-                        if (data.targetId === 'ALL') {
-                            if (data.payload.type === 'ANNOUNCE_SHOP' && data.senderId !== AppState.peerId) {
-                                registerDiscoveredShop(data.payload);
-                            } else if (data.payload.type === 'DISCOVER_SHOPS_PING' && data.senderId !== AppState.peerId && AppState.isOpen) {
-                                broadcastShopPresence();
-                            }
-                            return;
-                        }
-
-                        if (data.targetId !== AppState.peerId) return;
-
-                        // Create simulated connection object
-                        const mockConn = {
-                            peer: data.senderId,
-                            send: (msg) => {
-                                AppState.p2pChannel.postMessage({
-                                    targetId: data.senderId,
-                                    senderId: AppState.peerId,
-                                    payload: msg
-                                });
-                            }
-                        };
-
-                        handleIncomingP2PData(mockConn, data.payload);
-                    };
-                }
-            } catch (e) {
-                console.warn("BroadcastChannel error:", e);
-            }
-            showToast("サンドボックス内P2P通信モードで起動しました", "⚡");
-        }
-
-        function toggleShopOpen(open) {
-            AppState.isOpen = open;
-            AppState.shopName = document.getElementById('shop-name-input').value || "マイマーケット";
-            AppState.shopOwnerEmoji = document.getElementById('shop-owner-emoji').value;
-
-            if (open) {
-                document.getElementById('btn-open-shop').style.display = 'none';
-                document.getElementById('btn-close-shop').style.display = 'block';
-                logShopActivity("🟢 ショップを開店しました！来客待機中...");
-                showToast("ショップをオンラインに公開しました");
-                broadcastShopPresence();
-            } else {
-                document.getElementById('btn-open-shop').style.display = 'block';
-                document.getElementById('btn-close-shop').style.display = 'none';
-                logShopActivity("🔴 ショップを閉店しました。");
-                showToast("ショップを閉店しました");
-            }
-        }
-
-        function broadcastShopPresence() {
-            if (!AppState.isOpen) return;
-            const payload = {
-                type: 'ANNOUNCE_SHOP',
-                senderId: AppState.peerId,
-                shopName: AppState.shopName,
-                shopOwnerEmoji: AppState.shopOwnerEmoji,
-                itemCount: AppState.items.length
-            };
-
-            if (AppState.useFallbackP2P && AppState.p2pChannel) {
-                AppState.p2pChannel.postMessage({
-                    targetId: 'ALL',
-                    senderId: AppState.peerId,
-                    payload: payload
-                });
-            }
-        }
-
-        function searchDiscoveredShops() {
-            showToast("公開中のショップを検索中...", "🔍");
-            
-            // Ping network for active shops
-            if (AppState.useFallbackP2P && AppState.p2pChannel) {
-                AppState.p2pChannel.postMessage({
-                    targetId: 'ALL',
-                    senderId: AppState.peerId,
-                    payload: { type: 'DISCOVER_SHOPS_PING' }
-                });
-            }
-
-            renderDiscoveredShops();
-        }
-
-        function registerDiscoveredShop(shopData) {
-            AppState.discoveredShops[shopData.senderId] = {
-                id: shopData.senderId,
-                name: shopData.shopName,
-                ownerEmoji: shopData.shopOwnerEmoji,
-                itemCount: shopData.itemCount,
-                lastSeen: Date.now()
-            };
-            renderDiscoveredShops();
-        }
-
-        function renderDiscoveredShops() {
-            const list = document.getElementById('discovered-shops-list');
-            if (!list) return;
-            list.innerHTML = '';
-
-            const shopIds = Object.keys(AppState.discoveredShops);
-            if (shopIds.length === 0) {
-                list.innerHTML = `
-                    <li style="grid-column: 1/-1; text-align:center; padding: 20px; color: var(--text-sub);">
-                        <p style="margin-bottom: 6px;">現在公開中のショップが見つかりません。</p>
-                        <small style="font-size:0.75rem;">※別タブや他端末で「ショップを開く」を押すとここに自動表示されます。</small>
-                    </li>
-                `;
-                return;
-            }
-
-            shopIds.forEach(id => {
-                const shop = AppState.discoveredShops[id];
-                const li = document.createElement('li');
-                li.className = 'item-card';
-                li.innerHTML = `
-                    <figure class="aura-box aura-gold">${shop.ownerEmoji || '👑'}</figure>
-                    <h3>${shop.name || 'ショップ'}</h3>
-                    <p style="font-size: 0.75rem; color: var(--accent-cyan);">商品数: ${shop.itemCount} 点</p>
-                    <p style="font-size: 0.65rem; color: var(--text-sub); word-break: break-all;">ID: ${id}</p>
-                    <button class="action-btn success" style="padding:6px; font-size:0.8rem; margin-top:4px;" onclick="connectToPeerShop('${id}')">🏬 訪問する</button>
-                `;
-                list.appendChild(li);
-            });
-        }
-
-        function logShopActivity(msg) {
-            const logs = document.getElementById('shop-logs');
-            const li = document.createElement('li');
-            li.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
-            logs.prepend(li);
-        }
-
-        function handleIncomingP2PData(conn, data) {
-            if (!AppState.isOpen && data.type !== 'BUY_REQUEST') {
-                if (conn.send) conn.send({ type: 'SHOP_CLOSED' });
-                return;
-            }
-
-            if (data.type === 'GET_SHOP_INFO') {
-                // Send shop data back to visitor
-                const response = {
-                    type: 'SHOP_INFO_RESPONSE',
-                    shopName: AppState.shopName,
-                    ownerEmoji: AppState.shopOwnerEmoji,
-                    items: AppState.items
-                };
-                if (conn.send) conn.send(response);
-                logShopActivity(`👥 訪問者が来ました (Peer: ${String(conn.peer).substring(0, 8)}...)`);
-            } else if (data.type === 'BUY_REQUEST') {
-                // Handle item purchase transaction
-                const item = AppState.items.find(i => i.id === data.itemId);
-                if (item) {
-                    // Credit seller
-                    AppState.robux += item.price;
-                    updateRobuxDisplay();
-                    logShopActivity(`💰 商品 [${item.name}] が売れました！ (+${item.price} R$)`);
+                this.shopData.items.forEach((item, index) => {
+                    const li = document.createElement("li");
+                    li.className = `bg-gray-950 p-4 rounded-xl aura-${item.aura} flex flex-col justify-between gap-3 relative`;
                     
-                    if (conn.send) {
-                        conn.send({
-                            type: 'BUY_SUCCESS',
-                            item: item
+                    li.innerHTML = `
+                        <header class="flex items-start justify-between">
+                            <figure class="flex items-center gap-3">
+                                <span class="text-4xl bg-gray-900 p-2 rounded-lg border border-gray-800">${item.emoji}</span>
+                                <figcaption class="flex flex-col">
+                                    <h4 class="font-black text-white text-base">${item.name}</h4>
+                                    <span class="text-xs font-mono font-bold text-yellow-400">${item.price} Robux</span>
+                                </figcaption>
+                            </figure>
+                            <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${item.type==='lucky'?'bg-pink-500/20 text-pink-400 border border-pink-500/40':'bg-blue-500/20 text-blue-400 border border-blue-500/40'}">
+                                ${item.type==='lucky'?'🎰 ラッキー':'📦 通常'}
+                            </span>
+                        </header>
+                        <p class="text-xs text-gray-400 line-clamp-2">${item.desc}</p>
+                        <footer class="flex items-center justify-between border-t border-gray-800 pt-2 text-xs text-gray-500">
+                            <span>添付: ${item.fileData ? 'あり' : 'なし'}</span>
+                            <button onclick="App.deleteBuilderItem(${index})" class="text-red-400 hover:text-red-300 font-bold px-2 py-1 rounded bg-red-950/40 hover:bg-red-900/60 transition">
+                                削除
+                            </button>
+                        </footer>
+                    `;
+                    container.appendChild(li);
+                });
+            },
+
+            // Legacy alias redirected to Full Save Code
+            exportShopCode() {
+                this.openFullSaveModal();
+            },
+
+            importShopPrompt() {
+                this.importFullSavePrompt();
+            },
+
+            copySaveCode() {
+                const textarea = document.getElementById("export-code-textarea");
+                textarea.select();
+                document.execCommand('copy');
+                this.showToast("📋 セーブコードをクリップボードにコピーしました！");
+            },
+
+            // HOSTING LOGIC (ショップを開く)
+            startHosting() {
+                this.updateShopMetadataFromInputs();
+                
+                // Generate 3-digit passcode (e.g. 100~999)
+                const pass = Math.floor(100 + Math.random() * 900).toString();
+                this.hostPasscode = pass;
+
+                // Peer ID prefix for scope
+                const peerId = `robux-store-p2p-${pass}`;
+
+                this.logHost(`[INIT] P2P サーバーレスノード起動中... (Passcode: ${pass})`);
+
+                try {
+                    this.peer = new Peer(peerId, { debug: 1 });
+
+                    this.peer.on('open', (id) => {
+                        this.isHosting = true;
+                        document.getElementById("host-pass-display").innerText = pass;
+                        document.getElementById("host-code-card").classList.remove("hidden");
+                        document.getElementById("btn-start-host").classList.add("hidden");
+                        document.getElementById("btn-stop-host").classList.remove("hidden");
+                        document.getElementById("host-status-icon").className = "text-6xl text-green-400 animate-bounce";
+                        this.logHost(`[OPEN] 通信可能状態になりました。相手にコード ${pass} をお伝えください。`);
+                    });
+
+                    this.peer.on('connection', (conn) => {
+                        this.logHost(`[CONNECT] プレイヤーからの接続要求を受信...`);
+                        this.hostConnections.push(conn);
+
+                        conn.on('open', () => {
+                            this.logHost(`[SUCCESS] クライアントと直接P2P接続成功！ショップデータを送信します。`);
+                            // Send shop data to client
+                            conn.send({
+                                type: 'SHOP_DATA_RESPONSE',
+                                shop: this.shopData
+                            });
+                        });
+
+                        conn.on('data', (data) => {
+                            if (data.type === 'PURCHASE_NOTIFICATION') {
+                                this.logHost(`[SALE 🎉] 商品 「${data.itemName}」 が ${data.price} Robux で売れました！`);
+                            }
+                        });
+
+                        conn.on('close', () => {
+                            this.logHost(`[DISCONNECT] プレイヤーが切断しました。`);
+                        });
+                    });
+
+                    this.peer.on('error', (err) => {
+                        this.logHost(`[ERROR] Peerエラー: ${err.type}`);
+                        if (err.type === 'unavailable-id') {
+                            this.logHost(`[WARN] コードが衝突しました。再試行してください。`);
+                        }
+                    });
+
+                } catch (e) {
+                    this.logHost(`[ERROR] 接続初期化失敗: ${e.message}`);
+                }
+            },
+
+            stopHosting() {
+                if (this.peer) {
+                    this.peer.destroy();
+                    this.peer = null;
+                }
+                this.isHosting = false;
+                document.getElementById("host-code-card").classList.add("hidden");
+                document.getElementById("btn-start-host").classList.remove("hidden");
+                document.getElementById("btn-stop-host").classList.add("hidden");
+                document.getElementById("host-status-icon").className = "text-6xl animate-pulse";
+                this.logHost(`[CLOSED] ショップを閉じました。`);
+            },
+
+            logHost(msg) {
+                const el = document.getElementById("host-log-text");
+                el.innerText += `\n${msg}`;
+                el.scrollTop = el.scrollHeight;
+            },
+
+            // CLIENT CONNECT LOGIC (ショップを見る)
+            connectToHost() {
+                const pass = document.getElementById("connect-pass-input").value.trim();
+                if (pass.length !== 3) {
+                    this.showToast("⚠️ 3桁のパスワードを入力してください");
+                    return;
+                }
+
+                const targetPeerId = `robux-store-p2p-${pass}`;
+                this.showToast(`📡 コード ${pass} へ接続中...`);
+
+                const clientPeer = new Peer();
+
+                clientPeer.on('open', () => {
+                    const conn = clientPeer.connect(targetPeerId);
+                    this.clientConn = conn;
+
+                    conn.on('open', () => {
+                        this.showToast("✅ P2P接続成功！ショップを読み込んでいます...");
+                    });
+
+                    conn.on('data', (data) => {
+                        if (data.type === 'SHOP_DATA_RESPONSE') {
+                            this.activeBrowseShop = data.shop;
+                            document.getElementById("browse-connection-status").innerHTML = `<i class="fa-solid fa-wifi text-green-400"></i> P2P通信中 (KEY: ${pass})`;
+                            this.renderBrowseShop();
+                        }
+                    });
+
+                    conn.on('error', (err) => {
+                        this.showToast("❌ 接続エラーが発生しました");
+                    });
+                });
+
+                clientPeer.on('error', (err) => {
+                    this.showToast("❌ ホストが見つかりません。3桁コードを確認してください。");
+                });
+            },
+
+            loadLocalShopToBrowse() {
+                this.updateShopMetadataFromInputs();
+                this.activeBrowseShop = this.shopData;
+                document.getElementById("browse-connection-status").innerHTML = `<i class="fa-solid fa-house text-cyan-400"></i> ローカルプレビューモード`;
+                this.renderBrowseShop();
+            },
+
+            renderBrowseShop() {
+                if (!this.activeBrowseShop) return;
+
+                document.getElementById("browse-shop-title").innerText = this.activeBrowseShop.name || "未設定ショップ";
+                document.getElementById("browse-owner-emoji").innerText = this.activeBrowseShop.ownerEmoji || "👑";
+
+                const container = document.getElementById("browse-items-container");
+                container.innerHTML = "";
+
+                if (!this.activeBrowseShop.items || this.activeBrowseShop.items.length === 0) {
+                    container.innerHTML = `
+                        <li class="col-span-full py-12 text-center text-gray-500 font-bold border-2 border-dashed border-gray-800 rounded-xl">
+                            このショップにはまだ商品が並んでいません。
+                        </li>
+                    `;
+                    return;
+                }
+
+                this.activeBrowseShop.items.forEach((item) => {
+                    const li = document.createElement("li");
+                    li.className = `bg-gray-950 p-5 rounded-2xl aura-${item.aura} flex flex-col justify-between gap-4 shadow-xl border border-gray-800`;
+
+                    li.innerHTML = `
+                        <figure class="flex items-center gap-4">
+                            <span class="text-5xl bg-gray-900 p-3 rounded-2xl border border-gray-800 shadow-inner">${item.emoji}</span>
+                            <figcaption class="flex flex-col">
+                                <h4 class="font-black text-white text-lg">${item.name}</h4>
+                                <span class="text-sm font-mono font-black text-yellow-400 flex items-center gap-1">
+                                    💰 ${item.price.toLocaleString()} Robux
+                                </span>
+                            </figcaption>
+                        </figure>
+
+                        <p class="text-xs text-gray-400 leading-relaxed">${item.desc}</p>
+
+                        <button onclick="App.buyItem('${item.id}')" class="w-full py-3 rounded-xl font-black text-sm transition transform active:scale-95 shadow-lg flex items-center justify-center gap-2 ${item.type==='lucky'?'bg-gradient-to-r from-pink-500 to-purple-600 text-white hover:opacity-90':'bg-gradient-to-r from-yellow-500 to-amber-600 text-gray-950 hover:from-yellow-400 hover:to-amber-500'}">
+                            <i class="fa-solid fa-cart-shopping"></i>
+                            <span>${item.type==='lucky'?'ラッキーブロックを購入 (ガチャ)':'購入する'}</span>
+                        </button>
+                    `;
+                    container.appendChild(li);
+                });
+            },
+
+            // Purchase Logic
+            buyItem(itemId) {
+                if (!this.activeBrowseShop) return;
+                const item = this.activeBrowseShop.items.find(i => i.id === itemId);
+                if (!item) return;
+
+                if (this.userRobux < item.price) {
+                    this.showToast("❌ Robuxが不足しています！");
+                    return;
+                }
+
+                // Deduct Robux
+                this.userRobux -= item.price;
+                this.updateRobuxDisplays();
+
+                // Send purchase notice to host if P2P connected
+                if (this.clientConn && this.clientConn.open) {
+                    this.clientConn.send({
+                        type: 'PURCHASE_NOTIFICATION',
+                        itemName: item.name,
+                        price: item.price
+                    });
+                }
+
+                if (item.type === 'lucky') {
+                    // Start Roulette animation
+                    this.startLuckyRoulette(item);
+                } else {
+                    // Normal item purchase
+                    this.addItemToInventory({
+                        id: 'inv_' + Date.now(),
+                        name: item.name,
+                        emoji: item.emoji,
+                        aura: item.aura,
+                        fileData: item.fileData,
+                        fileName: item.fileName,
+                        isSaved: false // Crucial anti-exploit check
+                    });
+                    this.showToast(`🎉 「${item.name}」 を購入しました！(セーブしてダウンロード)`);
+                }
+            },
+
+            // ROULETTE / GACHA SYSTEM
+            startLuckyRoulette(luckyItem) {
+                const modal = document.getElementById("modal-roulette");
+                const titleText = document.getElementById("roulette-title-text");
+                const emojiDisplay = document.getElementById("roulette-emoji-display");
+                const nameDisplay = document.getElementById("roulette-name-display");
+                const subText = document.getElementById("roulette-sub-text");
+                const closeBtn = document.getElementById("btn-roulette-close");
+
+                modal.classList.remove("hidden");
+                closeBtn.classList.add("hidden");
+                titleText.innerText = "ラッキーブロック開封中...";
+                subText.innerText = "ルーレットが回転中...";
+
+                const entries = luckyItem.entries || [];
+                if (entries.length === 0) return;
+
+                // Probability Calculation
+                let totalProb = entries.reduce((acc, cur) => acc + cur.prob, 0);
+                let rand = Math.random() * totalProb;
+                let wonEntry = entries[0];
+
+                for (let entry of entries) {
+                    if (rand < entry.prob) {
+                        wonEntry = entry;
+                        break;
+                    }
+                    rand -= entry.prob;
+                }
+
+                // Roulette Animation parameters
+                let speed = 50; // ms per tick
+                let totalTicks = 30; // total spins
+                let currentTick = 0;
+
+                const spinLoop = () => {
+                    const randomPick = entries[Math.floor(Math.random() * entries.length)];
+                    emojiDisplay.innerText = randomPick.emoji;
+                    nameDisplay.innerText = randomPick.name;
+
+                    currentTick++;
+
+                    if (currentTick < totalTicks) {
+                        speed += currentTick * 4; // Gradually slows down
+                        setTimeout(spinLoop, speed);
+                    } else {
+                        // Stop at Winning Entry!
+                        emojiDisplay.innerText = wonEntry.emoji;
+                        nameDisplay.innerText = wonEntry.name;
+                        titleText.innerText = "🎉 大当たり獲得！";
+                        subText.innerText = `排出確率: ${wonEntry.prob}% のレアアイテムを入手！`;
+                        closeBtn.classList.remove("hidden");
+
+                        // Add reward to inventory
+                        this.addItemToInventory({
+                            id: 'inv_' + Date.now(),
+                            name: wonEntry.name,
+                            emoji: wonEntry.emoji,
+                            aura: wonEntry.aura,
+                            fileData: wonEntry.fileData,
+                            fileName: wonEntry.fileName,
+                            isSaved: false // Crucial anti-exploit check
                         });
                     }
-                }
-            }
-        }
-
-        function connectToPeerShop(targetId) {
-            if (!targetId) {
-                targetId = document.getElementById('target-peer-id')?.value.trim();
-            }
-
-            if (!targetId) {
-                showToast("訪問するショップを選択してください", "⚠️");
-                return;
-            }
-
-            showToast("ショップへ接続中...", "📡");
-
-            if (AppState.useFallbackP2P) {
-                // Use BroadcastChannel Fallback
-                if (!AppState.p2pChannel) return;
-
-                const messageHandler = (event) => {
-                    const data = event.data;
-                    if (data && data.targetId === AppState.peerId && data.senderId === targetId) {
-                        const payload = data.payload;
-                        if (payload.type === 'SHOP_CLOSED') {
-                            showToast("このショップは閉店しています", "❌");
-                        } else if (payload.type === 'SHOP_INFO_RESPONSE') {
-                            const mockConn = { peer: targetId };
-                            displayVisitingShop(mockConn, payload);
-                        } else if (payload.type === 'BUY_SUCCESS') {
-                            processPurchasedItem(payload.item);
-                        }
-                    }
                 };
 
-                AppState.p2pChannel.addEventListener('message', messageHandler);
+                spinLoop();
+            },
 
-                AppState.p2pChannel.postMessage({
-                    targetId: targetId,
-                    senderId: AppState.peerId,
-                    payload: { type: 'GET_SHOP_INFO' }
-                });
-                return;
-            }
+            closeRouletteModal() {
+                document.getElementById("modal-roulette").classList.add("hidden");
+            },
 
-            // Standard PeerJS Connection
-            const conn = AppState.peer.connect(targetId);
+            addItemToInventory(itemData) {
+                this.userInventory.unshift(itemData);
+                this.renderInventory();
+            },
 
-            conn.on('open', () => {
-                conn.send({ type: 'GET_SHOP_INFO' });
-            });
+            // Anti-Exploit Save Guard & Download Feature
+            renderInventory() {
+                const container = document.getElementById("inventory-items-container");
+                container.innerHTML = "";
 
-            conn.on('data', (data) => {
-                if (data.type === 'SHOP_CLOSED') {
-                    showToast("このショップは閉店しています", "❌");
-                } else if (data.type === 'SHOP_INFO_RESPONSE') {
-                    displayVisitingShop(conn, data);
-                } else if (data.type === 'BUY_SUCCESS') {
-                    processPurchasedItem(data.item);
+                if (this.userInventory.length === 0) {
+                    container.innerHTML = `
+                        <li class="col-span-full py-8 text-center text-gray-500 font-bold border border-gray-800 rounded-xl">
+                            購入したアイテムはありません。
+                        </li>
+                    `;
+                    return;
                 }
-            });
-        }
 
-        function displayVisitingShop(conn, shopData) {
-            const card = document.getElementById('visiting-shop-card');
-            card.style.display = 'flex';
-            document.getElementById('visiting-shop-title').innerText = `🏪 ${shopData.shopName}`;
-            document.getElementById('visiting-shop-owner').innerText = `店長: ${shopData.ownerEmoji}`;
+                this.userInventory.forEach((item, index) => {
+                    const li = document.createElement("li");
+                    li.className = `bg-gray-950 p-4 rounded-xl border border-gray-800 aura-${item.aura} flex items-center justify-between gap-3`;
 
-            const list = document.getElementById('visiting-item-list');
-            list.innerHTML = '';
+                    const downloadBtnHtml = item.isSaved ? `
+                        <button onclick="App.downloadItemFile(${index})" class="bg-green-600 hover:bg-green-500 text-white font-bold text-xs px-3 py-2 rounded-lg flex items-center gap-1 shadow-md transition active:scale-95">
+                            <i class="fa-solid fa-download"></i>
+                            <span>ダウンロード</span>
+                        </button>
+                    ` : `
+                        <button disabled title="上部の「セーブコード発行」を行わないと悪用防止のためダウンロードできません" class="bg-gray-800 text-gray-500 border border-gray-700 font-bold text-xs px-3 py-2 rounded-lg flex items-center gap-1 cursor-not-allowed opacity-70">
+                            <i class="fa-solid fa-lock"></i>
+                            <span>要セーブコード</span>
+                        </button>
+                    `;
 
-            if (shopData.items.length === 0) {
-                list.innerHTML = '<li style="grid-column: 1/-1; color:var(--text-sub); text-align:center;">商品が登録されていません。</li>';
-                return;
-            }
-
-            shopData.items.forEach(item => {
-                const li = document.createElement('li');
-                li.className = 'item-card';
-                li.innerHTML = `
-                    <figure class="aura-box ${item.aura}">${item.emoji}</figure>
-                    <h3>${item.name}</h3>
-                    <p class="price">💰 ${item.price} R$</p>
-                    <button class="action-btn success" style="padding:6px; font-size:0.8rem;" onclick="buyItemFromPeer('${conn.peer}', '${item.id}', ${item.price})">購入</button>
-                `;
-                list.appendChild(li);
-            });
-
-            showToast("ショップデータを読み込みました");
-        }
-
-        function buyItemFromPeer(peerId, itemId, price) {
-            if (AppState.robux < price) {
-                showToast("Robux が足りません！", "❌");
-                return;
-            }
-
-            if (AppState.useFallbackP2P) {
-                AppState.robux -= price;
-                updateRobuxDisplay();
-
-                AppState.p2pChannel.postMessage({
-                    targetId: peerId,
-                    senderId: AppState.peerId,
-                    payload: {
-                        type: 'BUY_REQUEST',
-                        itemId: itemId
-                    }
+                    li.innerHTML = `
+                        <figure class="flex items-center gap-3">
+                            <span class="text-3xl bg-gray-900 p-2 rounded-lg border border-gray-800">${item.emoji}</span>
+                            <figcaption class="flex flex-col">
+                                <h5 class="font-bold text-white text-sm">${item.name}</h5>
+                                <span class="text-[10px] text-gray-400 font-mono">${item.fileName || 'file'}</span>
+                            </figcaption>
+                        </figure>
+                        ${downloadBtnHtml}
+                    `;
+                    container.appendChild(li);
                 });
-                showToast("購入処理中...", "💰");
-                return;
-            }
+            },
 
-            const conn = AppState.peer.connect(peerId);
-            conn.on('open', () => {
-                // Deduct currency
-                AppState.robux -= price;
-                updateRobuxDisplay();
-                
-                conn.send({
-                    type: 'BUY_REQUEST',
-                    itemId: itemId
-                });
-
-                showToast("購入処理中...", "💰");
-            });
-
-            conn.on('data', (data) => {
-                if (data.type === 'BUY_SUCCESS') {
-                    processPurchasedItem(data.item);
+            downloadItemFile(inventoryIndex) {
+                const item = this.userInventory[inventoryIndex];
+                if (!item || !item.isSaved) {
+                    this.showToast("⚠️ セーブコードを発行（保存）しないとダウンロードできません！");
+                    return;
                 }
-            });
-        }
 
-        function processPurchasedItem(item) {
-            if (item.type === 'lucky') {
-                // Trigger Lucky Block Roulette Animation
-                startLuckyRoulette(item);
-            } else {
-                // Add Normal Item to Inventory
-                addToInventory(item);
-                showToast(`商品 [${item.name}] を購入しました！`);
-            }
-        }
-
-        function startLuckyRoulette(luckyBlock) {
-            const modal = document.getElementById('roulette-modal');
-            const iconDisplay = document.getElementById('roulette-icon');
-            const nameDisplay = document.getElementById('roulette-result-name');
-            const closeBtn = document.getElementById('roulette-close-btn');
-
-            closeBtn.style.display = 'none';
-            nameDisplay.innerText = "スロット回転中...";
-            modal.showModal();
-
-            // Calculate Roulette Outcome based on Probabilities
-            const selectedWonItem = calculateLuckyOutcome(luckyBlock.contents);
-
-            let speed = 50;
-            let currentIdx = 0;
-            let counter = 0;
-            const totalRolls = 30; // Total spin ticks
-
-            function spinStep() {
-                const item = luckyBlock.contents[currentIdx % luckyBlock.contents.length];
-                iconDisplay.innerText = item.emoji;
-                currentIdx++;
-                counter++;
-
-                if (counter < totalRolls) {
-                    // Gradually slow down
-                    speed += 10;
-                    setTimeout(spinStep, speed);
+                if (!item.fileData) {
+                    // Fallback sample file generation if no file was uploaded
+                    const sampleText = `[ROBUX P2P STORE ITEM LOG]\nItem Name: ${item.name}\nItem Emoji: ${item.emoji}\nPurchased successfully.`;
+                    const blob = new Blob([sampleText], { type: "text/plain" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = item.fileName || `${item.name}.txt`;
+                    a.click();
+                    URL.revokeObjectURL(url);
                 } else {
-                    // Final Stop on Won Item
-                    iconDisplay.innerText = selectedWonItem.emoji;
-                    nameDisplay.innerText = `🎉 獲得: ${selectedWonItem.name}!`;
-                    closeBtn.style.display = 'block';
-
-                    // Prepare Item for Inventory
-                    const finalItem = {
-                        id: 'won_' + Date.now(),
-                        type: 'normal',
-                        name: selectedWonItem.name,
-                        emoji: selectedWonItem.emoji,
-                        aura: selectedWonItem.aura,
-                        fileData: selectedWonItem.fileData
-                    };
-
-                    addToInventory(finalItem);
+                    const a = document.createElement("a");
+                    a.href = item.fileData;
+                    a.download = item.fileName || "digital_item";
+                    a.click();
                 }
-            }
 
-            spinStep();
-        }
+                this.showToast("📥 ファイルをダウンロードしました！");
+            },
 
-        function calculateLuckyOutcome(contents) {
-            const totalProb = contents.reduce((acc, c) => acc + c.prob, 0);
-            let rand = Math.random() * totalProb;
-
-            for (let item of contents) {
-                if (rand < item.prob) {
-                    return item;
+            // Toast Notification Helper (Pure Custom UI, NO alert())
+            showToast(msg) {
+                let toast = document.getElementById("app-toast-message");
+                if (!toast) {
+                    toast = document.createElement("aside");
+                    toast.id = "app-toast-message";
+                    toast.className = "fixed bottom-5 right-5 bg-gray-900/95 border-2 border-cyan-400 text-white font-bold text-sm px-5 py-3 rounded-2xl shadow-2xl z-50 transition transform translate-y-10 opacity-0 flex items-center gap-2 backdrop-blur-md";
+                    document.body.appendChild(toast);
                 }
-                rand -= item.prob;
+
+                toast.innerText = msg;
+                toast.classList.remove("translate-y-10", "opacity-0");
+
+                clearTimeout(this._toastTimer);
+                this._toastTimer = setTimeout(() => {
+                    toast.classList.add("translate-y-10", "opacity-0");
+                }, 3000);
             }
-            return contents[0]; // Fallback
-        }
+        };
 
-        function closeRouletteModal() {
-            document.getElementById('roulette-modal').close();
-        }
-
-        function addToInventory(item) {
-            AppState.inventory.push(item);
-            renderInventory();
-        }
-
-        function renderInventory() {
-            const list = document.getElementById('inventory-item-list');
-            list.innerHTML = '';
-
-            if (AppState.inventory.length === 0) {
-                list.innerHTML = '<li style="grid-column: 1/-1; color:var(--text-sub); text-align:center;">所持品はありません。ショップで購入しよう！</li>';
-                return;
-            }
-
-            AppState.inventory.forEach((item) => {
-                const isUnlocked = AppState.savedInventoryKeys.has(item.id);
-                const li = document.createElement('li');
-                li.className = 'item-card';
-                li.innerHTML = `
-                    <figure class="aura-box ${item.aura}">${item.emoji}</figure>
-                    <h3>${item.name}</h3>
-                    <p style="font-size:0.75rem; color: var(--text-sub);">${isUnlocked ? "🔓 セーブ確認済み" : "🔒 未セーブ (DL不可)"}</p>
-                    <button class="action-btn ${isUnlocked ? 'success' : 'secondary'}" 
-                            style="padding:6px; font-size:0.75rem;" 
-                            ${!isUnlocked ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''} 
-                            onclick="downloadFile('${item.id}')">
-                        ${isUnlocked ? "📥 ダウンロード" : "🔒 セーブして解禁"}
-                    </button>
-                `;
-                list.appendChild(li);
-            });
-        }
-
-        function downloadFile(itemId) {
-            const item = AppState.inventory.find(i => i.id === itemId);
-            if (!item || !item.fileData) {
-                showToast("ファイルが見つかりません", "⚠️");
-                return;
-            }
-
-            // Execute file download using dynamic anchor
-            const a = document.createElement('a');
-            a.href = item.fileData.data;
-            a.download = item.fileData.name || 'downloaded_item';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            showToast("ファイルをダウンロードしました！", "📥");
-        }
-
-        function generateSaveCode() {
-            // Unlock all current inventory items upon save
-            AppState.inventory.forEach(i => AppState.savedInventoryKeys.add(i.id));
-
-            const payload = {
-                robux: AppState.robux,
-                shopName: AppState.shopName,
-                shopOwnerEmoji: AppState.shopOwnerEmoji,
-                items: AppState.items,
-                inventory: AppState.inventory,
-                unlockedKeys: Array.from(AppState.savedInventoryKeys)
-            };
-
-            // Base64 JSON Encoding
-            const jsonStr = JSON.stringify(payload);
-            const saveCode = btoa(encodeURIComponent(jsonStr));
-
-            const output = document.getElementById('save-code-output');
-            output.value = saveCode;
-
-            // Copy to Clipboard
-            output.select();
-            document.execCommand('copy');
-
-            renderInventory(); // Refresh download buttons
-            showToast("セーブコードをコピー＆保存完了！ダウンロードボタンが解放されました");
-        }
-
-        function loadSaveCode() {
-            const code = document.getElementById('load-code-input').value.trim();
-            if (!code) {
-                showToast("セーブコードを入力してください", "⚠️");
-                return;
-            }
-
-            try {
-                const jsonStr = decodeURIComponent(atob(code));
-                const payload = JSON.parse(jsonStr);
-
-                AppState.robux = payload.robux || 1000;
-                AppState.shopName = payload.shopName || "マイマーケット";
-                AppState.shopOwnerEmoji = payload.shopOwnerEmoji || "👑";
-                AppState.items = payload.items || [];
-                AppState.inventory = payload.inventory || [];
-                AppState.savedInventoryKeys = new Set(payload.unlockedKeys || []);
-
-                document.getElementById('shop-name-input').value = AppState.shopName;
-                document.getElementById('shop-owner-emoji').value = AppState.shopOwnerEmoji;
-
-                updateRobuxDisplay();
-                renderBuilderItems();
-                renderInventory();
-
-                showToast("セーブデータをロードしました！");
-            } catch (err) {
-                console.error("Save code load error:", err);
-                showToast("無効なセーブコードです", "❌");
-            }
-        }
+        // Window Load Bootstrapper
+        window.onload = () => {
+            App.init();
+        };
     </script>
 </body>
 </html>
