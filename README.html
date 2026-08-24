@@ -10,6 +10,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <!-- Tone.js for Audio -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <!-- PeerJS for Serverless P2P Multiplayer -->
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   
   <style>
     * {
@@ -69,7 +71,7 @@
 </head>
 <body class="bg-black text-slate-100 overflow-hidden w-screen h-screen m-0 p-0">
 
-  <!-- MAIN APP CONTAINER (NO DIV ALLOWED!) -->
+  <!-- MAIN APP CONTAINER (NO DIV ALLOWED IN THE ENTIRE HTML!) -->
   <main class="relative w-full h-full overflow-hidden select-none">
     
     <!-- 3D Game Canvas -->
@@ -78,8 +80,120 @@
     <!-- Horror / Sky Atmospheric Overlay -->
     <section id="vignette-overlay" class="vignette-day absolute inset-0 z-10 pointer-events-none transition-all duration-1000"></section>
 
+    <!-- TITLE SCREEN (START OVERLAY) -->
+    <aside id="title-screen" class="absolute inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
+      <header class="mb-8">
+        <h1 class="text-4xl md:text-7xl font-black text-red-600 tracking-widest blood-glow mb-2">99日の絶望</h1>
+        <p class="text-sm md:text-xl text-slate-400 font-bold">3D ホラーサバイバル - 2〜5人マルチ協力対応</p>
+      </header>
+
+      <!-- Player Profile Card in Title -->
+      <article class="bg-slate-900/90 border border-slate-700 p-4 rounded-2xl mb-8 flex items-center gap-4 min-w-[280px]">
+        <span id="title-avatar-display" class="text-4xl bg-slate-800 p-2 rounded-2xl border border-slate-600">🧑‍🌾</span>
+        <section class="text-left">
+          <p class="text-xs text-slate-400">現在のプレイヤー名</p>
+          <p id="title-name-display" class="text-lg font-bold text-amber-400">サバイバー</p>
+        </section>
+        <button onclick="ui.openSettings()" class="ml-auto bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-2 rounded-xl border border-slate-600">
+          ⚙️ 設定
+        </button>
+      </article>
+
+      <!-- Main Action Menu Buttons -->
+      <nav class="flex flex-col gap-4 w-64 md:w-80">
+        <button onclick="ui.startSoloGame()" class="w-full bg-gradient-to-r from-red-800 to-amber-700 hover:from-red-700 hover:to-amber-600 border-2 border-amber-500 text-white font-extrabold text-lg py-4 rounded-2xl shadow-xl active:scale-95 transition-all">
+          🕹️ 1人プレイで開始
+        </button>
+        <button onclick="ui.openLobbyModal()" class="w-full bg-gradient-to-r from-indigo-800 to-purple-800 hover:from-indigo-700 hover:to-purple-700 border-2 border-indigo-400 text-white font-extrabold text-lg py-4 rounded-2xl shadow-xl active:scale-95 transition-all">
+          👥 2〜5人協力マルチ
+        </button>
+      </nav>
+    </aside>
+
+    <!-- SETTINGS MODAL -->
+    <aside id="settings-modal" class="absolute inset-0 z-50 bg-black/90 backdrop-blur-xl flex flex-col items-center justify-center p-6 hidden">
+      <article class="bg-slate-900 border-2 border-amber-600/80 rounded-3xl p-6 w-full max-w-md shadow-2xl">
+        <h2 class="text-2xl font-black text-amber-500 mb-6 text-center">⚙️ プレイヤー設定</h2>
+        
+        <!-- Name Input -->
+        <label class="block mb-4">
+          <span class="text-xs font-bold text-slate-300 block mb-1">プレイヤー名</span>
+          <input type="text" id="setting-name-input" maxlength="10" value="サバイバー" class="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:outline-none focus:border-amber-500 text-base">
+        </label>
+
+        <!-- Icon Emoji Selection -->
+        <section class="mb-6">
+          <span class="text-xs font-bold text-slate-300 block mb-2">アイコン (絵文字) 選択</span>
+          <section id="emoji-selector-grid" class="grid grid-cols-5 gap-2"></section>
+        </section>
+
+        <footer class="flex justify-end gap-3">
+          <button onclick="ui.closeSettings()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-6 py-2.5 rounded-xl border border-slate-600">
+            完了
+          </button>
+        </footer>
+      </article>
+    </aside>
+
+    <!-- MULTIPLAYER LOBBY MODAL -->
+    <aside id="lobby-modal" class="absolute inset-0 z-50 bg-slate-950/95 backdrop-blur-xl flex flex-col items-center justify-center p-6 hidden">
+      <article class="bg-slate-900 border-2 border-indigo-600/80 rounded-3xl p-6 w-full max-w-lg shadow-2xl flex flex-col">
+        <header class="flex justify-between items-center mb-6 border-b border-slate-800 pb-3">
+          <h2 class="text-2xl font-black text-indigo-400">👥 P2P 協力マルチ</h2>
+          <button onclick="ui.closeLobbyModal()" class="text-slate-400 hover:text-white font-bold text-lg">✕</button>
+        </header>
+
+        <!-- Room Host / Join Tabs -->
+        <nav class="flex gap-2 mb-6 border-b border-slate-800 pb-3">
+          <button id="tab-host-btn" onclick="ui.switchLobbyTab('host')" class="flex-1 py-2 rounded-xl font-bold bg-indigo-700 text-white">部屋を作る (ホスト)</button>
+          <button id="tab-join-btn" onclick="ui.switchLobbyTab('join')" class="flex-1 py-2 rounded-xl font-bold bg-slate-800 text-slate-400">参加する (ゲスト)</button>
+        </nav>
+
+        <!-- Host View -->
+        <section id="lobby-host-view" class="flex flex-col items-center gap-4">
+          <p class="text-xs text-slate-400">ホストとして部屋を作成します。3桁の部屋パスワードを発行します。</p>
+          <button id="btn-create-room" onclick="multiNetwork.createRoom()" class="bg-indigo-600 hover:bg-indigo-500 font-bold text-white px-8 py-3 rounded-2xl shadow-lg active:scale-95">
+            🔑 部屋パスワードを発行
+          </button>
+
+          <article id="room-pass-container" class="hidden text-center bg-slate-950 border border-indigo-500/60 p-4 rounded-2xl w-full">
+            <p class="text-xs text-indigo-300 font-bold">部屋パスワード (参加者に共有):</p>
+            <p id="room-pass-display" class="text-4xl font-black tracking-widest text-amber-400 my-1">---</p>
+            <p class="text-[10px] text-slate-400">サーバーレス (PeerJS P2P) で直接通信します</p>
+          </article>
+        </section>
+
+        <!-- Join View -->
+        <section id="lobby-join-view" class="flex flex-col items-center gap-4 hidden">
+          <p class="text-xs text-slate-400">ホストから教わった3桁のパスワードを入力してください</p>
+          <input type="number" id="join-pass-input" placeholder="例: 482" min="100" max="999" class="bg-slate-950 border border-indigo-500/60 text-center text-3xl font-black tracking-widest text-amber-400 p-3 rounded-2xl w-48 focus:outline-none">
+          <button onclick="multiNetwork.joinRoom()" class="bg-purple-600 hover:bg-purple-500 font-bold text-white px-8 py-3 rounded-2xl shadow-lg active:scale-95">
+            🚀 参加する
+          </button>
+        </section>
+
+        <!-- Member List Container (2-5 Players) -->
+        <section class="mt-6 border-t border-slate-800 pt-4">
+          <header class="flex justify-between items-center mb-3">
+            <span class="text-xs font-bold text-slate-300">集まったサバイバー (最大5人)</span>
+            <span id="member-count-badge" class="text-xs font-bold bg-slate-800 px-2 py-0.5 rounded-full text-indigo-400">1 / 5</span>
+          </header>
+          <ul id="lobby-member-list" class="flex flex-col gap-2 max-h-40 overflow-y-auto">
+            <!-- Dynamically filled -->
+          </ul>
+        </section>
+
+        <!-- Start Button for Host -->
+        <footer class="mt-6 border-t border-slate-800 pt-4">
+          <button id="btn-start-multi" onclick="multiNetwork.startMultiGame()" class="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed font-black text-lg py-3 rounded-2xl text-white shadow-xl active:scale-95" disabled>
+            ▶️ 全員でスタート (ホストのみ)
+          </button>
+        </footer>
+      </article>
+    </aside>
+
     <!-- HUD Overlay Section -->
-    <section id="hud-layer" class="absolute inset-0 z-20 pointer-events-none flex flex-col justify-between p-3 md:p-6">
+    <section id="hud-layer" class="absolute inset-0 z-20 pointer-events-none flex flex-col justify-between p-3 md:p-6 hidden">
       
       <!-- Top Bar: Stats, Day Info, Coins -->
       <header class="flex justify-between items-start w-full pointer-events-auto">
@@ -92,6 +206,11 @@
             <span id="hud-time-bar" class="block h-full bg-amber-400 w-full transition-all duration-300"></span>
           </section>
         </article>
+
+        <!-- Multi Active Player Badges -->
+        <aside id="hud-multi-players" class="flex gap-2 bg-slate-900/80 p-2 rounded-xl border border-slate-700/60 hidden">
+          <!-- Populated in multiplayer -->
+        </aside>
 
         <!-- Player Health, Battery & Coins -->
         <article class="flex flex-col gap-2 items-end">
@@ -188,7 +307,7 @@
             </button>
             <!-- Flashlight Toggle -->
             <button onclick="game.toggleFlashlight()" class="w-12 h-12 rounded-2xl bg-slate-800 border border-slate-600 text-white font-bold flex items-center justify-center shadow-lg active:scale-90 text-xl">
-              🔦
+              flashlight
             </button>
           </section>
 
@@ -202,7 +321,7 @@
 
     </section>
 
-    <!-- SHOP MODAL (NO DIV TAGS!) -->
+    <!-- SHOP MODAL -->
     <aside id="shop-modal" class="absolute inset-0 z-30 bg-slate-950/95 backdrop-blur-xl flex flex-col p-4 md:p-8 hidden">
       <header class="flex justify-between items-center border-b border-amber-900/60 pb-4 mb-4">
         <section>
@@ -234,7 +353,7 @@
       </main>
     </aside>
 
-    <!-- GAME OVER SCREEN (NO DIV TAGS) -->
+    <!-- GAME OVER SCREEN -->
     <aside id="gameover-modal" class="absolute inset-0 z-40 bg-black/95 flex flex-col items-center justify-center p-6 text-center hidden">
       <h1 class="text-5xl md:text-7xl font-black text-red-600 tracking-widest blood-glow mb-4">YOU DIED</h1>
       <p class="text-xl md:text-2xl text-slate-300 mb-2">暗闇の恐怖に呑み込まれた...</p>
@@ -301,8 +420,10 @@
 
     const soundFx = new SoundEngine();
 
-    const MAP_SIZE = 300; // 300m x 300m Map size
+    const MAP_SIZE = 300;
     const HALF_MAP = MAP_SIZE / 2;
+
+    const EMOJI_OPTIONS = ['🧑‍🌾', '🥷', '👨‍🚀', '🦸', '🧟', '🎃', '🤖', '🐱', '🐻', '👑'];
 
     // Database of 15 Enemy Types with unique visuals & AI behaviors
     const ENEMY_TYPES = [
@@ -323,7 +444,7 @@
       { id: 14, name: "[スーパーボス] 終焉の神", hp: 4500, atk: 140, speed: 3.2, bounty: 5000, color: 0x7e22ce, scale: [4.8, 6.5, 4.8], isBoss: true, model: 'superboss' }
     ];
 
-    // Traps Database (5 Placeable Types)
+    // Traps Database
     const TRAPS_DB = [
       { id: 'bear', name: 'トラバサミ', price: 120, color: 0x475569, icon: '🪤', desc: '触れた敵の動きを止め大ダメージを与える' },
       { id: 'spike', name: 'スパイクフロア', price: 180, color: 0x94a3b8, icon: '🗡️', desc: '範囲内の敵に持続ダメージを与える' },
@@ -352,15 +473,213 @@
       { id: 4, name: "神聖エイギスの盾衣", def: 80, price: 16000, desc: "ダメージ80%カット" }
     ];
 
+    // PeerJS Serverless Multiplayer Network Engine (~7Hz Sync rate = ~142ms)
+    class MultiNetworkManager {
+      constructor() {
+        this.peer = null;
+        this.connections = {}; // id -> DataConnection
+        this.isHost = false;
+        this.roomCode = null;
+        this.myId = null;
+        this.members = []; // [{ id, name, icon, isHost }]
+        this.sendInterval = null;
+      }
+
+      initPeer(callback) {
+        if (this.peer) {
+          if (callback) callback();
+          return;
+        }
+        this.peer = new Peer();
+        this.peer.on('open', (id) => {
+          this.myId = id;
+          if (callback) callback();
+        });
+
+        this.peer.on('connection', (conn) => {
+          this.handleIncomingConnection(conn);
+        });
+      }
+
+      createRoom() {
+        soundFx.init();
+        // Generate 3-digit room code
+        this.roomCode = Math.floor(100 + Math.random() * 900).toString();
+        const customId = `despair99-room-${this.roomCode}`;
+
+        if (this.peer) this.peer.destroy();
+
+        this.peer = new Peer(customId);
+        this.peer.on('open', (id) => {
+          this.myId = id;
+          this.isHost = true;
+          this.members = [{ id: this.myId, name: ui.playerName, icon: ui.playerIcon, isHost: true }];
+          
+          document.getElementById('room-pass-display').innerText = this.roomCode;
+          document.getElementById('room-pass-container').classList.remove('hidden');
+          this.updateLobbyMemberList();
+          ui.updateHostStartButton();
+        });
+
+        this.peer.on('connection', (conn) => {
+          this.handleIncomingConnection(conn);
+        });
+
+        this.peer.on('error', (err) => {
+          alert('部屋作成エラー: このパスワードは使用中かもしれません。再試行してください。');
+        });
+      }
+
+      joinRoom() {
+        soundFx.init();
+        const codeInput = document.getElementById('join-pass-input').value.trim();
+        if (!codeInput || codeInput.length !== 3) {
+          alert('3桁のパスワードを入力してください');
+          return;
+        }
+
+        const targetPeerId = `despair99-room-${codeInput}`;
+        this.initPeer(() => {
+          const conn = this.peer.connect(targetPeerId);
+          conn.on('open', () => {
+            this.connections[targetPeerId] = conn;
+            // Send join request with my profile
+            conn.send({
+              type: 'JOIN_REQ',
+              profile: { id: this.myId, name: ui.playerName, icon: ui.playerIcon }
+            });
+          });
+
+          conn.on('data', (data) => this.handleData(data, conn));
+          conn.on('close', () => alert('ホストとの接続が切断されました'));
+        });
+      }
+
+      handleIncomingConnection(conn) {
+        conn.on('open', () => {
+          this.connections[conn.peer] = conn;
+        });
+
+        conn.on('data', (data) => this.handleData(data, conn));
+        conn.on('close', () => {
+          delete this.connections[conn.peer];
+          this.members = this.members.filter(m => m.id !== conn.peer);
+          this.updateLobbyMemberList();
+          if (game) game.removeOtherPlayerMesh(conn.peer);
+        });
+      }
+
+      handleData(data, conn) {
+        if (data.type === 'JOIN_REQ') {
+          if (!this.isHost) return;
+          if (this.members.length >= 5) {
+            conn.send({ type: 'REJECT', reason: '部屋が満員です' });
+            return;
+          }
+          const newMember = { ...data.profile, isHost: false };
+          this.members.push(newMember);
+          this.updateLobbyMemberList();
+          ui.updateHostStartButton();
+
+          // Broadcast updated member list to all
+          this.broadcast({ type: 'MEMBER_LIST', members: this.members });
+
+        } else if (data.type === 'MEMBER_LIST') {
+          this.members = data.members;
+          this.updateLobbyMemberList();
+
+        } else if (data.type === 'START_GAME') {
+          ui.launchGameFromLobby(true);
+
+        } else if (data.type === 'SYNC_POS') {
+          // Received position from another player (~7Hz)
+          if (game) {
+            game.updateRemotePlayerState(data);
+          }
+          if (this.isHost) {
+            // Host re-broadcasts to all other peers
+            this.broadcast(data, conn.peer);
+          }
+        }
+      }
+
+      updateLobbyMemberList() {
+        const list = document.getElementById('lobby-member-list');
+        list.innerHTML = '';
+        this.members.forEach(m => {
+          const item = document.createElement('li');
+          item.className = "bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between";
+          item.innerHTML = `
+            <section class="flex items-center gap-3">
+              <span class="text-2xl">${m.icon}</span>
+              <span class="font-bold text-slate-100">${m.name} ${m.id === this.myId ? '(あなた)' : ''}</span>
+            </section>
+            ${m.isHost ? '<span class="text-xs bg-indigo-900/80 text-indigo-300 font-bold px-2 py-1 rounded-md border border-indigo-500">ホスト</span>' : '<span class="text-xs text-slate-500">メンバー</span>'}
+          `;
+          list.appendChild(item);
+        });
+        document.getElementById('member-count-badge').innerText = `${this.members.length} / 5`;
+      }
+
+      broadcast(data, excludePeerId = null) {
+        Object.keys(this.connections).forEach(peerId => {
+          if (peerId !== excludePeerId && this.connections[peerId].open) {
+            this.connections[peerId].send(data);
+          }
+        });
+      }
+
+      startMultiGame() {
+        if (!this.isHost) return;
+        this.broadcast({ type: 'START_GAME' });
+        ui.launchGameFromLobby(true);
+      }
+
+      startSyncLoop() {
+        // 7 times per second = ~142ms interval
+        if (this.sendInterval) clearInterval(this.sendInterval);
+        this.sendInterval = setInterval(() => {
+          if (!game) return;
+          const pos = game.camera.position;
+          const rot = game.cameraEuler;
+          
+          const syncPacket = {
+            type: 'SYNC_POS',
+            senderId: this.myId,
+            name: ui.playerName,
+            icon: ui.playerIcon,
+            x: pos.x,
+            y: pos.y,
+            z: pos.z,
+            yaw: rot.y,
+            hp: game.hp,
+            weaponIdx: game.selectedWeaponIndex,
+            isAttacking: game.weaponRenderer.isAttackingAnim
+          };
+
+          if (this.isHost) {
+            this.broadcast(syncPacket);
+          } else {
+            // Guest sends to Host
+            const hostConn = Object.values(this.connections)[0];
+            if (hostConn && hostConn.open) {
+              hostConn.send(syncPacket);
+            }
+          }
+        }, 142);
+      }
+    }
+
+    const multiNetwork = new MultiNetworkManager();
+
     class WorldBuilder {
       constructor(scene) {
         this.scene = scene;
-        this.buildings = []; // Stores collision hitboxes and entrances
+        this.buildings = [];
         this.chests = [];
       }
 
       generateWorld() {
-        // Ground Mesh (300m x 300m) with rough height variation
         const groundGeo = new THREE.PlaneGeometry(MAP_SIZE, MAP_SIZE, 48, 48);
         const pos = groundGeo.attributes.position;
         for (let i = 0; i < pos.count; i++) {
@@ -371,17 +690,12 @@
         }
         groundGeo.computeVertexNormals();
 
-        const groundMat = new THREE.MeshStandardMaterial({
-          color: 0x2e3d2a,
-          roughness: 0.9,
-          metalness: 0.05
-        });
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x2e3d2a, roughness: 0.9, metalness: 0.05 });
         const ground = new THREE.Mesh(groundGeo, groundMat);
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
         this.scene.add(ground);
 
-        // Map Boundary Walls
         const wallMat = new THREE.MeshBasicMaterial({ color: 0x1e293b, wireframe: true, transparent: true, opacity: 0.2 });
         const fenceGeo = new THREE.BoxGeometry(MAP_SIZE, 15, 2);
         
@@ -391,15 +705,11 @@
         const westWall = new THREE.Mesh(fenceGeo, wallMat); westWall.position.set(-HALF_MAP, 7.5, 0); westWall.rotation.y = Math.PI/2;
         this.scene.add(northWall, southWall, eastWall, westWall);
 
-        // Plant Environment Elements
         this.populateEnvironment();
-
-        // Construct 30 Enterable Horror Buildings with Interiors and Chests
         this.create30EnterableBuildings();
       }
 
       populateEnvironment() {
-        // Trees
         const trunkGeo = new THREE.CylinderGeometry(0.3, 0.5, 6, 6);
         const foliageGeo = new THREE.ConeGeometry(2.5, 6, 6);
         const trunkMat = new THREE.MeshStandardMaterial({ color: 0x3d2314, roughness: 0.9 });
@@ -411,10 +721,8 @@
           if (Math.abs(x) < 12 && Math.abs(z) < 12) continue;
 
           const treeGroup = new THREE.Group();
-          const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-          trunk.position.y = 3;
-          const foliage = new THREE.Mesh(foliageGeo, foliageMat);
-          foliage.position.y = 7;
+          const trunk = new THREE.Mesh(trunkGeo, trunkMat); trunk.position.y = 3;
+          const foliage = new THREE.Mesh(foliageGeo, foliageMat); foliage.position.y = 7;
 
           treeGroup.add(trunk, foliage);
           treeGroup.position.set(x, 0, z);
@@ -423,7 +731,6 @@
           this.scene.add(treeGroup);
         }
 
-        // Rocks
         const rockGeo = new THREE.DodecahedronGeometry(1, 1);
         const rockMat = new THREE.MeshStandardMaterial({ color: 0x52525b, roughness: 0.95 });
 
@@ -458,22 +765,17 @@
           const buildingGroup = new THREE.Group();
           buildingGroup.position.set(x, 0, z);
 
-          // Build enterable structure with walls, doorway & interior floor
           const dimensions = this.buildEnterableStructure(buildingGroup, i);
-
           this.scene.add(buildingGroup);
 
-          // Register collision boundary
           this.buildings.push({
             name: buildingNames[i],
-            x: x,
-            z: z,
+            x: x, z: z,
             width: dimensions.width,
             depth: dimensions.depth,
             doorwayZ: dimensions.depth / 2
           });
 
-          // Spawn Treasure Chest Inside Building
           if (Math.random() < 0.8) {
             this.spawnChestInside(x, z);
           }
@@ -491,28 +793,22 @@
         const wallThick = 0.6;
         const doorWidth = 3.5;
 
-        // Interior Floor
-        const floorGeo = new THREE.BoxGeometry(width - 0.2, 0.2, depth - 0.2);
-        const floor = new THREE.Mesh(floorGeo, matFloor);
+        const floor = new THREE.Mesh(new THREE.BoxGeometry(width - 0.2, 0.2, depth - 0.2), matFloor);
         floor.position.y = 0.1;
         group.add(floor);
 
-        // North Wall
         const backWall = new THREE.Mesh(new THREE.BoxGeometry(width, height, wallThick), matWall);
         backWall.position.set(0, height / 2, -depth / 2);
         group.add(backWall);
 
-        // East Wall
         const rightWall = new THREE.Mesh(new THREE.BoxGeometry(wallThick, height, depth), matWall);
         rightWall.position.set(width / 2, height / 2, 0);
         group.add(rightWall);
 
-        // West Wall
         const leftWall = new THREE.Mesh(new THREE.BoxGeometry(wallThick, height, depth), matWall);
         leftWall.position.set(-width / 2, height / 2, 0);
         group.add(leftWall);
 
-        // South Wall (With Open Doorway Entrance)
         const frontWallLeftWidth = (width - doorWidth) / 2;
         const frontWallLeft = new THREE.Mesh(new THREE.BoxGeometry(frontWallLeftWidth, height, wallThick), matWall);
         frontWallLeft.position.set(-width / 2 + frontWallLeftWidth / 2, height / 2, depth / 2);
@@ -522,7 +818,6 @@
 
         group.add(frontWallLeft, frontWallRight);
 
-        // Roof
         const roof = new THREE.Mesh(new THREE.BoxGeometry(width + 0.8, wallThick, depth + 0.8), matRoof);
         roof.position.set(0, height + wallThick / 2, 0);
         group.add(roof);
@@ -535,20 +830,14 @@
         const chestMat = new THREE.MeshStandardMaterial({ color: 0x854d0e, roughness: 0.6 });
         const goldMat = new THREE.MeshStandardMaterial({ color: 0xeab308, metalness: 0.9, roughness: 0.2 });
 
-        const box = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8, 0.8), chestMat);
-        box.position.y = 0.4;
-
-        const band = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.15, 0.85), goldMat);
-        band.position.y = 0.4;
+        const box = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8, 0.8), chestMat); box.position.y = 0.4;
+        const band = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.15, 0.85), goldMat); band.position.y = 0.4;
 
         chestGroup.add(box, band);
         chestGroup.position.set(bx + (Math.random() - 0.5) * 4, 0, bz + (Math.random() - 0.5) * 4);
         this.scene.add(chestGroup);
 
-        this.chests.push({
-          mesh: chestGroup,
-          opened: false
-        });
+        this.chests.push({ mesh: chestGroup, opened: false });
       }
 
       checkBuildingCollision(pos, radius = 0.8) {
@@ -558,18 +847,14 @@
           const minZ = b.z - b.depth / 2 - radius;
           const maxZ = b.z + b.depth / 2 + radius;
 
-          // Doorway Opening check (Front wall gap)
           const isNearDoorway = Math.abs(pos.x - b.x) < 1.6 && Math.abs(pos.z - (b.z + b.depth / 2)) < 1.5;
-          
-          if (isNearDoorway) continue; // Allow entry through door
+          if (isNearDoorway) continue;
 
           if (pos.x > minX && pos.x < maxX && pos.z > minZ && pos.z < maxZ) {
-            // Push out from wall closest boundary
             const dxMin = Math.abs(pos.x - minX);
             const dxMax = Math.abs(pos.x - maxX);
             const dzMin = Math.abs(pos.z - minZ);
             const dzMax = Math.abs(pos.z - maxZ);
-
             const minDist = Math.min(dxMin, dxMax, dzMin, dzMax);
 
             if (minDist === dxMin) pos.x = minX;
@@ -581,250 +866,63 @@
       }
     }
 
-    class EnemyManager {
-      constructor(scene) {
-        this.scene = scene;
-        this.enemies = [];
-        this.projectiles = []; // Dark orbs / Boss skill shots
-      }
-
-      spawnEnemy(typeData, playerPos, dayNum) {
+    // Detailed Humanoid Player Mesh Builder for Multiplayer Teammates
+    class OtherPlayerMeshBuilder {
+      static createPlayerMesh(name, icon) {
         const group = new THREE.Group();
 
-        const mat = new THREE.MeshStandardMaterial({
-          color: typeData.color,
-          roughness: 0.6,
-          metalness: 0.2
-        });
-
-        // Base Body Geometry
-        const bodyGeo = new THREE.CylinderGeometry(0.45, 0.35, 1.5, 8);
-        const body = new THREE.Mesh(bodyGeo, mat);
-        body.position.y = 0.75;
-        group.add(body);
+        // Clothes/Skin Materials
+        const skinMat = new THREE.MeshStandardMaterial({ color: 0xfde047, roughness: 0.8 });
+        const shirtMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.5 });
+        const pantsMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.6 });
 
         // Head
-        let headGeo = new THREE.SphereGeometry(0.35, 8, 8);
-        if (typeData.model === 'alien_grey' || typeData.model === 'alien_warrior' || typeData.model === 'alien_mother') {
-          headGeo = new THREE.SphereGeometry(0.45, 8, 8);
-          headGeo.scale(1, 1.5, 1.2);
-        }
-
-        const headMat = typeData.isBoss ? 
-          new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0x7f1d1d }) : mat;
-        const head = new THREE.Mesh(headGeo, headMat);
-        head.position.y = 1.7;
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 12), skinMat);
+        head.position.y = 1.6;
         group.add(head);
 
-        // Eyes
-        const eyeMat = new THREE.MeshBasicMaterial({ color: typeData.model.includes('alien') ? 0x000000 : 0xef4444 });
-        const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.08, 4, 4), eyeMat);
-        eyeL.position.set(0.12, 1.75, 0.32);
-        const eyeR = new THREE.Mesh(new THREE.SphereGeometry(0.08, 4, 4), eyeMat);
-        eyeR.position.set(-0.12, 1.75, 0.32);
-        group.add(eyeL, eyeR);
+        // Body / Torso
+        const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.3, 0.9, 8), shirtMat);
+        torso.position.y = 0.95;
+        group.add(torso);
 
-        // Attachments
-        if (typeData.model === 'deer') {
-          const antlerMat = new THREE.MeshStandardMaterial({ color: 0x3f2e21 });
-          const a1 = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.8), antlerMat);
-          a1.position.set(0.2, 2.2, 0); a1.rotation.z = -0.4;
-          const a2 = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.8), antlerMat);
-          a2.position.set(-0.2, 2.2, 0); a2.rotation.z = 0.4;
-          group.add(a1, a2);
-        } else if (typeData.model === 'owl') {
-          const beak = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.25, 4), new THREE.MeshBasicMaterial({ color: 0xf59e0b }));
-          beak.position.set(0, 1.65, 0.38); beak.rotation.x = Math.PI/2;
-          group.add(beak);
-        }
+        // Legs
+        const legL = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.1, 0.7, 8), pantsMat);
+        legL.position.set(0.16, 0.35, 0);
+        const legR = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.1, 0.7, 8), pantsMat);
+        legR.position.set(-0.16, 0.35, 0);
+        group.add(legL, legR);
 
         // Arms
-        const armGeo = new THREE.BoxGeometry(0.18, 0.85, 0.18);
-        const armL = new THREE.Mesh(armGeo, mat); armL.position.set(0.55, 1.1, 0);
-        const armR = new THREE.Mesh(armGeo, mat); armR.position.set(-0.55, 1.1, 0);
+        const armL = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.08, 0.7, 8), shirtMat);
+        armL.position.set(0.42, 0.95, 0);
+        const armR = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.08, 0.7, 8), shirtMat);
+        armR.position.set(-0.42, 0.95, 0);
         group.add(armL, armR);
 
-        group.scale.set(typeData.scale[0], typeData.scale[1], typeData.scale[2]);
+        // Floating Name Tag with Icon Texture
+        const canvas = document.createElement('canvas');
+        canvas.width = 256; canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+        ctx.roundRect(0, 0, 256, 64, 16);
+        ctx.fill();
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+        ctx.font = 'bold 28px sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${icon} ${name}`, 128, 42);
 
-        // Spawn position around player
-        const spawnDist = 30 + Math.random() * 30;
-        const angle = Math.random() * Math.PI * 2;
-        const spawnX = Math.max(-HALF_MAP + 5, Math.min(HALF_MAP - 5, playerPos.x + Math.cos(angle) * spawnDist));
-        const spawnZ = Math.max(-HALF_MAP + 5, Math.min(HALF_MAP - 5, playerPos.z + Math.sin(angle) * spawnDist));
-        
-        group.position.set(spawnX, typeData.skill === 'fly' ? 4 : 0, spawnZ);
-        this.scene.add(group);
+        const tex = new THREE.CanvasTexture(canvas);
+        const spriteMat = new THREE.SpriteMaterial({ map: tex });
+        const sprite = new THREE.Sprite(spriteMat);
+        sprite.position.set(0, 2.3, 0);
+        sprite.scale.set(2.2, 0.55, 1);
+        group.add(sprite);
 
-        const dayScale = 1 + (dayNum * 0.12);
-        const enemyObj = {
-          mesh: group,
-          armL: armL,
-          armR: armR,
-          id: typeData.id,
-          name: typeData.name,
-          maxHp: Math.round(typeData.hp * dayScale),
-          hp: Math.round(typeData.hp * dayScale),
-          atk: Math.round(typeData.atk * dayScale),
-          speed: typeData.speed * (1 + Math.min(0.5, dayNum * 0.02)),
-          bounty: Math.round(typeData.bounty * (1 + dayNum * 0.1)),
-          isBoss: typeData.isBoss || false,
-          skill: typeData.skill || 'dash',
-          attackCooldown: 0,
-          skillCooldown: 2 + Math.random() * 3,
-          isPouncing: false,
-          isFreezed: false,
-          freezeTimer: 0,
-          animTime: Math.random() * 10
-        };
-
-        this.enemies.push(enemyObj);
-        return enemyObj;
-      }
-
-      updateEnemies(delta, playerPos, world, onHitPlayer) {
-        for (let i = this.enemies.length - 1; i >= 0; i--) {
-          const e = this.enemies[i];
-
-          // Freeze status effect handling
-          if (e.isFreezed) {
-            e.freezeTimer -= delta;
-            if (e.freezeTimer <= 0) e.isFreezed = false;
-          }
-
-          const currentSpeed = e.isFreezed ? e.speed * 0.2 : e.speed;
-
-          e.animTime += delta * 6;
-          e.skillCooldown -= delta;
-
-          const dx = playerPos.x - e.mesh.position.x;
-          const dz = playerPos.z - e.mesh.position.z;
-          const dist = Math.sqrt(dx * dx + dz * dz);
-
-          e.mesh.lookAt(playerPos.x, e.mesh.position.y, playerPos.z);
-
-          // AI Special Skill Execution
-          if (e.skillCooldown <= 0 && dist < 22 && !e.isFreezed) {
-            this.executeEnemySkill(e, playerPos, dx, dz, dist, onHitPlayer);
-            e.skillCooldown = e.isBoss ? 3.5 : (4.5 + Math.random() * 3);
-          }
-
-          // Flying Enemy Movement
-          if (e.skill === 'fly') {
-            e.mesh.position.y = 3.5 + Math.sin(e.animTime) * 1.2;
-          }
-
-          // Standard Movement AI
-          if (dist > 2.2) {
-            let moveDirX = dx / dist;
-            let moveDirZ = dz / dist;
-
-            // Flanking Movement logic
-            if (e.skill === 'flank' && dist > 6) {
-              moveDirX += Math.cos(e.animTime) * 0.6;
-              moveDirZ += Math.sin(e.animTime) * 0.6;
-            }
-
-            e.mesh.position.x += moveDirX * currentSpeed * delta;
-            e.mesh.position.z += moveDirZ * currentSpeed * delta;
-
-            // Check Building Collision
-            world.checkBuildingCollision(e.mesh.position, 0.9);
-
-            e.armL.rotation.x = Math.sin(e.animTime) * 0.5;
-            e.armR.rotation.x = -Math.sin(e.animTime) * 0.5;
-          } else {
-            // Melee Attack Range
-            e.attackCooldown -= delta;
-            e.armL.rotation.x = Math.sin(e.animTime * 3) * 1.2;
-            e.armR.rotation.x = -Math.sin(e.animTime * 3) * 1.2;
-
-            if (e.attackCooldown <= 0) {
-              e.attackCooldown = 1.2;
-              onHitPlayer(e.atk);
-              soundFx.playHit();
-            }
-          }
-        }
-
-        // Update Dark Orb Projectiles
-        for (let pIdx = this.projectiles.length - 1; pIdx >= 0; pIdx--) {
-          const p = this.projectiles[pIdx];
-          p.mesh.position.addScaledVector(p.dir, p.speed * delta);
-          p.life -= delta;
-
-          const pDist = p.mesh.position.distanceTo(playerPos);
-          if (pDist < 1.5) {
-            onHitPlayer(p.damage);
-            soundFx.playHit();
-            this.scene.remove(p.mesh);
-            this.projectiles.splice(pIdx, 1);
-            continue;
-          }
-
-          if (p.life <= 0) {
-            this.scene.remove(p.mesh);
-            this.projectiles.splice(pIdx, 1);
-          }
-        }
-      }
-
-      executeEnemySkill(e, playerPos, dx, dz, dist, onHitPlayer) {
-        if (e.isBoss) {
-          // 5 BOSS ATTACK PATTERNS (かっこいい技)
-          const pattern = Math.floor(Math.random() * 5);
-          if (pattern === 0) { // Pattern 1: Ground Shockwave
-            const ringGeo = new THREE.RingGeometry(0.5, 6, 16);
-            const ringMat = new THREE.MeshBasicMaterial({ color: 0xef4444, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
-            const ring = new THREE.Mesh(ringGeo, ringMat);
-            ring.rotation.x = -Math.PI / 2;
-            ring.position.copy(e.mesh.position);
-            this.scene.add(ring);
-            soundFx.playExplosion();
-            setTimeout(() => this.scene.remove(ring), 600);
-            if (dist < 7) onHitPlayer(e.atk * 1.3);
-
-          } else if (pattern === 1) { // Pattern 2: Shadow Teleport
-            e.mesh.position.set(playerPos.x + (Math.random() - 0.5) * 4, 0, playerPos.z + (Math.random() - 0.5) * 4);
-            soundFx.playNightScream();
-
-          } else if (pattern === 2) { // Pattern 3: Homing Dark Orb Barrage
-            for (let i = 0; i < 3; i++) {
-              const orbGeo = new THREE.SphereGeometry(0.4, 8, 8);
-              const orbMat = new THREE.MeshBasicMaterial({ color: 0xa855f7 });
-              const orb = new THREE.Mesh(orbGeo, orbMat);
-              orb.position.set(e.mesh.position.x, 2, e.mesh.position.z);
-              
-              const dir = new THREE.Vector3().subVectors(playerPos, orb.position).normalize();
-              this.scene.add(orb);
-              this.projectiles.push({ mesh: orb, dir: dir, speed: 18, damage: e.atk * 0.8, life: 3.5 });
-            }
-
-          } else if (pattern === 3) { // Pattern 4: Screech Shockwave
-            soundFx.playNightScream();
-            if (dist < 12) onHitPlayer(e.atk * 0.9);
-
-          } else if (pattern === 4) { // Pattern 5: Flame Nova
-            soundFx.playExplosion();
-            if (dist < 9) onHitPlayer(e.atk * 1.5);
-          }
-        } else {
-          // Standard Enemies Skills
-          if (e.skill === 'pounce') { // Pounce
-            e.mesh.position.x += (dx / dist) * 6;
-            e.mesh.position.z += (dz / dist) * 6;
-            if (dist < 3) onHitPlayer(e.atk * 1.2);
-          } else if (e.skill === 'tackle') { // Tackle
-            e.mesh.position.x += (dx / dist) * 4;
-            e.mesh.position.z += (dz / dist) * 4;
-            if (dist < 2.5) onHitPlayer(e.atk * 1.3);
-          }
-        }
-      }
-
-      removeEnemy(index) {
-        const e = this.enemies[index];
-        this.scene.remove(e.mesh);
-        this.enemies.splice(index, 1);
+        return { mesh: group, armL: armL, armR: armR, legL: legL, legR: legR, sprite: sprite };
       }
     }
 
@@ -834,7 +932,6 @@
         this.weaponHolder = new THREE.Group();
         this.camera.add(this.weaponHolder);
         
-        // FPV Right Hand position
         this.weaponHolder.position.set(0.35, -0.3, -0.55);
         this.currentMesh = null;
         this.isAttackingAnim = false;
@@ -849,7 +946,7 @@
         const group = new THREE.Group();
         const w = WEAPONS[weaponIndex];
 
-        // 3D Player Arm & Hand Base
+        // 3D Player Arm
         const armMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.8 });
         const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.45), armMat);
         arm.position.set(0.05, -0.15, 0.2);
@@ -861,28 +958,27 @@
           const woodMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.8 });
           const bandMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
           
-          const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.25), woodMat);
-          handle.position.y = -0.05;
-          const forkL = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.15), woodMat);
-          forkL.position.set(-0.06, 0.1, 0); forkL.rotation.z = -0.3;
-          const forkR = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.15), woodMat);
-          forkR.position.set(0.06, 0.1, 0); forkR.rotation.z = 0.3;
+          const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.25), woodMat); handle.position.y = -0.05;
+          const forkL = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.15), woodMat); forkL.position.set(-0.06, 0.1, 0); forkL.rotation.z = -0.3;
+          const forkR = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.15), woodMat); forkR.position.set(0.06, 0.1, 0); forkR.rotation.z = 0.3;
 
-          this.slingshotBand = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.008, 0.008), bandMat);
-          this.slingshotBand.position.set(0, 0.15, -0.02);
+          const band = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.008, 0.008), bandMat);
+          band.position.set(0, 0.15, -0.02);
+          group.add(handle, forkL, forkR, band);
 
-          group.add(handle, forkL, forkR, this.slingshotBand);
         } else if (w.id === 1) { // Wooden Stick
           const woodMat = new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.9 });
           const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 1.0, 8), woodMat);
           stick.rotation.x = Math.PI / 3.2;
           group.add(stick);
+
         } else if (w.id === 2) { // Spiked Bat
           const batMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8, roughness: 0.3 });
           const bat = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.025, 1.1, 8), batMat);
           bat.rotation.x = Math.PI / 3.2;
           group.add(bat);
-        } else if (w.isGun) { // Gun models
+
+        } else if (w.isGun) { // Gun Models
           const gunMat = new THREE.MeshStandardMaterial({ color: w.id === 6 ? 0x0284c7 : 0x1e293b, metalness: 0.9, roughness: 0.2 });
           const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.1, 0.45), gunMat);
           const handle = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.18, 0.08), gunMat);
@@ -930,6 +1026,110 @@
       }
     }
 
+    class EnemyManager {
+      constructor(scene) {
+        this.scene = scene;
+        this.enemies = [];
+        this.projectiles = [];
+      }
+
+      spawnEnemy(typeData, playerPos, dayNum) {
+        const group = new THREE.Group();
+        const mat = new THREE.MeshStandardMaterial({ color: typeData.color, roughness: 0.6, metalness: 0.2 });
+
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.35, 1.5, 8), mat);
+        body.position.y = 0.75;
+        group.add(body);
+
+        let headGeo = new THREE.SphereGeometry(0.35, 8, 8);
+        if (typeData.model.includes('alien')) headGeo.scale(1, 1.5, 1.2);
+
+        const headMat = typeData.isBoss ? new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0x7f1d1d }) : mat;
+        const head = new THREE.Mesh(headGeo, headMat);
+        head.position.y = 1.7;
+        group.add(head);
+
+        const eyeMat = new THREE.MeshBasicMaterial({ color: typeData.model.includes('alien') ? 0x000000 : 0xef4444 });
+        const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.08, 4, 4), eyeMat); eyeL.position.set(0.12, 1.75, 0.32);
+        const eyeR = new THREE.Mesh(new THREE.SphereGeometry(0.08, 4, 4), eyeMat); eyeR.position.set(-0.12, 1.75, 0.32);
+        group.add(eyeL, eyeR);
+
+        const armGeo = new THREE.BoxGeometry(0.18, 0.85, 0.18);
+        const armL = new THREE.Mesh(armGeo, mat); armL.position.set(0.55, 1.1, 0);
+        const armR = new THREE.Mesh(armGeo, mat); armR.position.set(-0.55, 1.1, 0);
+        group.add(armL, armR);
+
+        group.scale.set(typeData.scale[0], typeData.scale[1], typeData.scale[2]);
+
+        const spawnDist = 30 + Math.random() * 30;
+        const angle = Math.random() * Math.PI * 2;
+        const spawnX = Math.max(-HALF_MAP + 5, Math.min(HALF_MAP - 5, playerPos.x + Math.cos(angle) * spawnDist));
+        const spawnZ = Math.max(-HALF_MAP + 5, Math.min(HALF_MAP - 5, playerPos.z + Math.sin(angle) * spawnDist));
+        
+        group.position.set(spawnX, typeData.skill === 'fly' ? 4 : 0, spawnZ);
+        this.scene.add(group);
+
+        const dayScale = 1 + (dayNum * 0.12);
+        const enemyObj = {
+          mesh: group, armL: armL, armR: armR,
+          id: typeData.id, name: typeData.name,
+          maxHp: Math.round(typeData.hp * dayScale),
+          hp: Math.round(typeData.hp * dayScale),
+          atk: Math.round(typeData.atk * dayScale),
+          speed: typeData.speed * (1 + Math.min(0.5, dayNum * 0.02)),
+          bounty: Math.round(typeData.bounty * (1 + dayNum * 0.1)),
+          isBoss: typeData.isBoss || false,
+          skill: typeData.skill || 'dash',
+          attackCooldown: 0, skillCooldown: 2 + Math.random() * 3,
+          isFreezed: false, freezeTimer: 0, animTime: Math.random() * 10
+        };
+
+        this.enemies.push(enemyObj);
+        return enemyObj;
+      }
+
+      updateEnemies(delta, playerPos, world, onHitPlayer) {
+        for (let i = this.enemies.length - 1; i >= 0; i--) {
+          const e = this.enemies[i];
+          if (e.isFreezed) {
+            e.freezeTimer -= delta;
+            if (e.freezeTimer <= 0) e.isFreezed = false;
+          }
+
+          const currentSpeed = e.isFreezed ? e.speed * 0.2 : e.speed;
+          e.animTime += delta * 6;
+          e.skillCooldown -= delta;
+
+          const dx = playerPos.x - e.mesh.position.x;
+          const dz = playerPos.z - e.mesh.position.z;
+          const dist = Math.sqrt(dx * dx + dz * dz);
+
+          e.mesh.lookAt(playerPos.x, e.mesh.position.y, playerPos.z);
+
+          if (dist > 2.2) {
+            let moveDirX = dx / dist;
+            let moveDirZ = dz / dist;
+            e.mesh.position.x += moveDirX * currentSpeed * delta;
+            e.mesh.position.z += moveDirZ * currentSpeed * delta;
+            world.checkBuildingCollision(e.mesh.position, 0.9);
+          } else {
+            e.attackCooldown -= delta;
+            if (e.attackCooldown <= 0) {
+              e.attackCooldown = 1.2;
+              onHitPlayer(e.atk);
+              soundFx.playHit();
+            }
+          }
+        }
+      }
+
+      removeEnemy(index) {
+        const e = this.enemies[index];
+        this.scene.remove(e.mesh);
+        this.enemies.splice(index, 1);
+      }
+    }
+
     class TrapManager {
       constructor(scene) {
         this.scene = scene;
@@ -942,77 +1142,30 @@
 
         const group = new THREE.Group();
         const mat = new THREE.MeshStandardMaterial({ color: trapData.color, roughness: 0.5 });
-
-        if (trapType === 'bear') {
-          const base = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.1, 1.2), mat);
-          const jaw1 = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.3, 0.1), mat); jaw1.position.set(0, 0.15, 0.5);
-          const jaw2 = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.3, 0.1), mat); jaw2.position.set(0, 0.15, -0.5);
-          group.add(base, jaw1, jaw2);
-        } else if (trapType === 'turret') {
-          const base = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, 1.2, 8), mat);
-          const head = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 8), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
-          head.position.y = 0.8;
-          group.add(base, head);
-        } else {
-          const base = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.12, 12), mat);
-          group.add(base);
-        }
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.12, 12), mat);
+        group.add(base);
 
         group.position.set(position.x, 0.06, position.z);
         this.scene.add(group);
 
-        this.placedTraps.push({
-          type: trapType,
-          mesh: group,
-          pos: position.clone(),
-          cooldown: 0
-        });
+        this.placedTraps.push({ type: trapType, mesh: group, pos: position.clone(), cooldown: 0 });
       }
 
       updateTraps(delta, enemies, onRemoveEnemy) {
         for (let i = this.placedTraps.length - 1; i >= 0; i--) {
           const t = this.placedTraps[i];
-          t.cooldown -= delta;
-
           for (let eIdx = enemies.length - 1; eIdx >= 0; eIdx--) {
             const e = enemies[eIdx];
-            const dist = t.pos.distanceTo(e.mesh.position);
-
-            if (dist < 2.0 && t.cooldown <= 0) {
-              if (t.type === 'bear') {
-                e.hp -= 150;
-                e.isFreezed = true;
-                e.freezeTimer = 3.0;
-                soundFx.playHit();
-                this.removeTrap(i);
-                break;
-              } else if (t.type === 'mine') {
-                e.hp -= 300;
-                soundFx.playExplosion();
-                this.removeTrap(i);
-                break;
-              } else if (t.type === 'frost') {
-                e.isFreezed = true;
-                e.freezeTimer = 5.0;
-                t.cooldown = 1.0;
-              } else if (t.type === 'turret') {
-                e.hp -= 45;
-                t.cooldown = 0.6;
-                soundFx.playAttack(true);
-              }
-
-              if (e.hp <= 0) {
-                onRemoveEnemy(eIdx, e);
-              }
+            if (t.pos.distanceTo(e.mesh.position) < 2.0) {
+              e.hp -= 120;
+              soundFx.playHit();
+              this.scene.remove(t.mesh);
+              this.placedTraps.splice(i, 1);
+              if (e.hp <= 0) onRemoveEnemy(eIdx, e);
+              break;
             }
           }
         }
-      }
-
-      removeTrap(index) {
-        const t = this.placedTraps[index];
-        this.scene.remove(t.mesh);
-        this.placedTraps.splice(index, 1);
       }
     }
 
@@ -1041,13 +1194,15 @@
         this.joystickVector = { x: 0, y: 0 };
         this.cameraEuler = new THREE.Euler(0, 0, 0, 'YXZ');
 
-        this.currentShopTab = 'weapons';
+        this.otherPlayers = {}; // peerId -> { meshObj, targetPos, targetYaw }
 
         this.init3D();
         this.initControls();
         this.initQuickslotsUI();
         this.initShopUI();
         this.startLoop();
+
+        if (multiNetwork.sendInterval) multiNetwork.startSyncLoop();
       }
 
       init3D() {
@@ -1057,54 +1212,25 @@
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
         this.scene = new THREE.Scene();
-        
-        // Daytime Bright Sky & Fog
         this.scene.background = new THREE.Color(0x87ceeb);
         this.scene.fog = new THREE.FogExp2(0x87ceeb, 0.005);
 
         this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 400);
         this.camera.position.set(0, 1.7, 0);
 
-        // Ambient Light (Bright during day)
         this.ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
         this.scene.add(this.ambientLight);
 
-        // Sun Directional Light
         this.sunLight = new THREE.DirectionalLight(0xfffbeb, 1.2);
         this.sunLight.position.set(100, 150, 50);
         this.scene.add(this.sunLight);
 
-        // Visible Sun Mesh
-        this.sunMesh = new THREE.Mesh(
-          new THREE.SphereGeometry(8, 16, 16),
-          new THREE.MeshBasicMaterial({ color: 0xfde047 })
-        );
-        this.sunMesh.position.set(120, 160, 60);
-        this.scene.add(this.sunMesh);
-
-        // Moon Directional Light
-        this.moonLight = new THREE.DirectionalLight(0x60a5fa, 0.0);
-        this.moonLight.position.set(-100, 120, -50);
-        this.scene.add(this.moonLight);
-
-        // Visible Moon Mesh
-        this.moonMesh = new THREE.Mesh(
-          new THREE.SphereGeometry(6, 16, 16),
-          new THREE.MeshBasicMaterial({ color: 0xe0f2fe })
-        );
-        this.moonMesh.position.set(-120, 140, -60);
-        this.moonMesh.visible = false;
-        this.scene.add(this.moonMesh);
-
-        // Flashlight
         this.flashlight = new THREE.SpotLight(0xfff5ea, 2.5, 45, Math.PI / 5, 0.4, 1);
         this.flashlight.visible = false;
         this.camera.add(this.flashlight);
-        this.flashlight.position.set(0, 0, 0);
         this.flashlight.target.position.set(0, 0, -1);
         this.camera.add(this.flashlight.target);
 
-        // Sub-managers
         this.weaponRenderer = new WeaponRenderer(this.camera);
         this.weaponRenderer.renderWeapon(this.selectedWeaponIndex);
 
@@ -1113,8 +1239,6 @@
 
         this.enemyMgr = new EnemyManager(this.scene);
         this.trapMgr = new TrapManager(this.scene);
-
-        this.ufos = []; // Day 3 UFOs
 
         window.addEventListener('resize', () => {
           this.camera.aspect = window.innerWidth / window.innerHeight;
@@ -1158,7 +1282,6 @@
         joyZone.addEventListener('touchend', endJoystick);
         joyZone.addEventListener('touchcancel', endJoystick);
 
-        // Touch Camera Rotation
         let cameraTouchId = null;
         let lastTouchPos = { x: 0, y: 0 };
 
@@ -1195,7 +1318,6 @@
         window.addEventListener('touchend', endCamera);
         window.addEventListener('touchcancel', endCamera);
 
-        // Keyboard Controls
         this.keys = {};
         window.addEventListener('keydown', (e) => {
           soundFx.init();
@@ -1236,12 +1358,10 @@
       attack() {
         const currentWeapon = WEAPONS[this.selectedWeaponIndex];
         soundFx.playAttack(currentWeapon.isGun);
-
         this.weaponRenderer.triggerAttackAnim(currentWeapon.isGun);
 
         const totalAtk = (currentWeapon.atk + (this.upgrades.atkBoost * 15));
         const attackRange = currentWeapon.range;
-
         const playerPos = this.camera.position;
         const forward = new THREE.Vector3(0, 0, -1).applyEuler(this.cameraEuler);
 
@@ -1253,17 +1373,10 @@
           if (dist <= attackRange) {
             toEnemy.normalize();
             const angle = forward.angleTo(toEnemy);
-            const maxAngle = currentWeapon.isGun ? Math.PI / 3 : Math.PI / 1.8;
-            
-            if (angle < maxAngle) {
+            if (angle < Math.PI / 2) {
               e.hp -= totalAtk;
               soundFx.playHit();
-
-              e.mesh.position.addScaledVector(toEnemy, 0.6);
-
-              if (e.hp <= 0) {
-                this.onEnemyKilled(i, e);
-              }
+              if (e.hp <= 0) this.onEnemyKilled(i, e);
             }
           }
         }
@@ -1278,139 +1391,54 @@
         this.enemyMgr.removeEnemy(index);
       }
 
+      updateRemotePlayerState(packet) {
+        if (!this.otherPlayers[packet.senderId]) {
+          const pObj = OtherPlayerMeshBuilder.createPlayerMesh(packet.name, packet.icon);
+          this.scene.add(pObj.mesh);
+          this.otherPlayers[packet.senderId] = {
+            obj: pObj,
+            targetPos: new THREE.Vector3(packet.x, 0, packet.z),
+            targetYaw: packet.yaw
+          };
+        } else {
+          const p = this.otherPlayers[packet.senderId];
+          p.targetPos.set(packet.x, 0, packet.z);
+          p.targetYaw = packet.yaw;
+        }
+      }
+
+      removeOtherPlayerMesh(peerId) {
+        if (this.otherPlayers[peerId]) {
+          this.scene.remove(this.otherPlayers[peerId].obj.mesh);
+          delete this.otherPlayers[peerId];
+        }
+      }
+
       updateDayCycle(delta) {
         this.dayTimeLeft -= delta;
-
         if (this.dayTimeLeft <= 0) {
           this.isNight = !this.isNight;
-          const vignette = document.getElementById('vignette-overlay');
-
           if (this.isNight) {
-            // NIGHT PHASE TRANSITION
             this.dayTimeLeft = 60;
             this.showBanner(`🌙 NIGHT ${this.day}: 恐怖の夜が訪れた...`);
             soundFx.playNightScream();
-
             this.scene.background = new THREE.Color(0x0b1120);
-            this.scene.fog.color = new THREE.Color(0x0b1120);
-            this.scene.fog.density = 0.015;
-
             this.ambientLight.intensity = 0.3;
-            this.sunLight.intensity = 0.0;
-            this.sunMesh.visible = false;
-
-            this.moonLight.intensity = 0.6;
-            this.moonMesh.visible = true;
-
-            vignette.className = "vignette-night absolute inset-0 z-10 pointer-events-none transition-all duration-1000";
-
-            this.spawnNightWave();
           } else {
-            // DAY PHASE TRANSITION
             this.day++;
             this.dayTimeLeft = 40;
-            this.showBanner(`☀️ DAY ${this.day}: 日が昇った！宝箱とショップで準備せよ`);
-
+            this.showBanner(`☀️ DAY ${this.day}: 日が昇った！宝箱を探そう`);
             this.scene.background = new THREE.Color(0x87ceeb);
-            this.scene.fog.color = new THREE.Color(0x87ceeb);
-            this.scene.fog.density = 0.005;
-
             this.ambientLight.intensity = 0.85;
-            this.sunLight.intensity = 1.2;
-            this.sunMesh.visible = true;
-
-            this.moonLight.intensity = 0.0;
-            this.moonMesh.visible = false;
-
-            vignette.className = "vignette-day absolute inset-0 z-10 pointer-events-none transition-all duration-1000";
-
-            const bonus = 120 + (this.day * 30);
-            this.coins += bonus;
-            this.showBanner(`生存報酬: +${bonus} コイン`);
-            document.getElementById('boss-hud').classList.add('hidden');
-
-            // Remove UFOs if daytime
-            this.clearUFOs();
+            this.coins += 150;
           }
         }
-
-        // Night Spawning
-        if (this.isNight && Math.random() < 0.03 && this.enemyMgr.enemies.length < (3 + Math.floor(this.day * 0.5))) {
-          const randTypeIndex = Math.floor(Math.random() * Math.min(13, 2 + Math.floor(this.day / 2)));
-          this.enemyMgr.spawnEnemy(ENEMY_TYPES[randTypeIndex], this.camera.position, this.day);
-        }
-
         this.updateHUD();
-      }
-
-      spawnNightWave() {
-        if (this.day === 3) {
-          // DAY 3 SPECIAL EVENT: 4 GIANT UFOs & ALIEN INVASION
-          this.showBanner("⚠️ DAY 3: 巨大UFO襲来！エイリアン大群が発生！");
-          this.spawn4UFOs();
-
-          for (let i = 0; i < 7; i++) {
-            const alienType = ENEMY_TYPES[2 + (i % 3)]; // Grey, Warrior, Mother
-            this.enemyMgr.spawnEnemy(alienType, this.camera.position, this.day);
-          }
-          return;
-        }
-
-        const isSuperBossDay = (this.day % 50 === 0);
-        const isBossDay = (this.day % 5 === 0);
-
-        if (isSuperBossDay) {
-          const boss = this.enemyMgr.spawnEnemy(ENEMY_TYPES[14], this.camera.position, this.day);
-          this.setupBossHUD(boss);
-        } else if (isBossDay) {
-          const boss = this.enemyMgr.spawnEnemy(ENEMY_TYPES[13], this.camera.position, this.day);
-          this.setupBossHUD(boss);
-        } else {
-          const count = Math.min(6, 2 + Math.floor(this.day * 0.3));
-          for (let i = 0; i < count; i++) {
-            const typeIndex = Math.floor(Math.random() * Math.min(13, 2 + Math.floor(this.day / 3)));
-            this.enemyMgr.spawnEnemy(ENEMY_TYPES[typeIndex], this.camera.position, this.day);
-          }
-        }
-      }
-
-      spawn4UFOs() {
-        const ufoGeo = new THREE.CylinderGeometry(8, 12, 3, 16);
-        const ufoMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9, roughness: 0.2 });
-        const lightMat = new THREE.MeshBasicMaterial({ color: 0x22d3ee });
-
-        const positions = [
-          { x: -60, z: -60 }, { x: 60, z: -60 },
-          { x: -60, z: 60 }, { x: 60, z: 60 }
-        ];
-
-        positions.forEach(p => {
-          const group = new THREE.Group();
-          const disc = new THREE.Mesh(ufoGeo, ufoMat);
-          const dome = new THREE.Mesh(new THREE.SphereGeometry(5, 12, 12), lightMat);
-          dome.position.y = 1.5;
-
-          group.add(disc, dome);
-          group.position.set(p.x, 35, p.z);
-          this.scene.add(group);
-          this.ufos.push(group);
-        });
-      }
-
-      clearUFOs() {
-        this.ufos.forEach(ufo => this.scene.remove(ufo));
-        this.ufos = [];
-      }
-
-      setupBossHUD(boss) {
-        const bossHud = document.getElementById('boss-hud');
-        document.getElementById('boss-name').innerText = `⚔️ ${boss.name}`;
-        bossHud.classList.remove('hidden');
       }
 
       updateHUD() {
         document.getElementById('hud-day').innerText = `DAY ${this.day}`;
-        document.getElementById('hud-time-phase').innerText = this.isNight ? "🌙 夜 (生存フェーズ)" : "☀️ 昼 (安全探索)";
+        document.getElementById('hud-time-phase').innerText = this.isNight ? "🌙 夜 (生存)" : "☀️ 昼 (探索)";
         document.getElementById('hud-coins').innerText = this.coins.toLocaleString();
         document.getElementById('hud-hp-text').innerText = `${Math.ceil(this.hp)} / ${this.maxHp}`;
         document.getElementById('hud-hp-bar').style.width = `${Math.max(0, (this.hp / this.maxHp) * 100)}%`;
@@ -1418,16 +1446,9 @@
         const totalPhaseTime = this.isNight ? 60 : 40;
         document.getElementById('hud-time-bar').style.width = `${(this.dayTimeLeft / totalPhaseTime) * 100}%`;
 
-        const activeBoss = this.enemyMgr.enemies.find(e => e.isBoss);
-        if (activeBoss) {
-          document.getElementById('boss-hp-text').innerText = `${Math.max(0, activeBoss.hp)} / ${activeBoss.maxHp}`;
-          document.getElementById('boss-hp-bar').style.width = `${Math.max(0, (activeBoss.hp / activeBoss.maxHp) * 100)}%`;
-        }
-
         document.getElementById('potion-count').innerText = `x${this.potions}`;
         document.getElementById('battery-count').innerText = `x${this.batteries}`;
 
-        // Check Nearby Treasure Chests
         let nearChest = null;
         for (let c of this.world.chests) {
           if (!c.opened && c.mesh.position.distanceTo(this.camera.position) < 3.0) {
@@ -1449,15 +1470,9 @@
       openChest(chestObj) {
         chestObj.opened = true;
         this.scene.remove(chestObj.mesh);
-
-        const keys = Object.keys(this.inventoryTraps);
-        const rewardTrap = keys[Math.floor(Math.random() * keys.length)];
-        this.inventoryTraps[rewardTrap]++;
-
-        const trapName = TRAPS_DB.find(t => t.id === rewardTrap).name;
+        this.coins += 200;
         soundFx.playCoin();
-        this.showBanner(`📦 宝箱を発見！ [${trapName}] を獲得！`);
-        this.initQuickslotsUI();
+        this.showBanner(`📦 宝箱を発見！ +200 コイン！`);
       }
 
       placeCurrentTrap() {
@@ -1475,7 +1490,6 @@
       }
 
       initQuickslotsUI() {
-        // Weapon Quickslots
         const wContainer = document.getElementById('weapon-slots-container');
         wContainer.innerHTML = '';
         WEAPONS.forEach((w, idx) => {
@@ -1484,14 +1498,10 @@
           const btn = document.createElement('button');
           btn.className = `w-11 h-11 md:w-13 md:h-13 bg-slate-800 border-2 ${isSelected ? 'border-amber-400 bg-amber-950/60' : 'border-slate-700'} rounded-xl flex flex-col items-center justify-center relative active:scale-95 shrink-0`;
           btn.onclick = () => this.selectWeapon(idx);
-          btn.innerHTML = `
-            <span class="text-lg">${w.icon}</span>
-            <span class="text-[8px] text-slate-300 mt-0.5 truncate max-w-full px-0.5">${w.name}</span>
-          `;
+          btn.innerHTML = `<span class="text-lg">${w.icon}</span><span class="text-[8px] text-slate-300 mt-0.5 truncate px-0.5">${w.name}</span>`;
           wContainer.appendChild(btn);
         });
 
-        // Trap Quickslots
         const tContainer = document.getElementById('trap-slots-container');
         tContainer.innerHTML = '';
         TRAPS_DB.forEach((t, idx) => {
@@ -1500,11 +1510,7 @@
           const btn = document.createElement('button');
           btn.className = `w-11 h-11 md:w-13 md:h-13 bg-slate-800 border-2 ${isSelected ? 'border-indigo-400 bg-indigo-950/60' : 'border-slate-700'} rounded-xl flex flex-col items-center justify-center relative active:scale-95 shrink-0`;
           btn.onclick = () => { this.selectedTrapIndex = idx; this.initQuickslotsUI(); };
-          btn.innerHTML = `
-            <span class="text-lg">${t.icon}</span>
-            <span class="absolute top-0.5 right-1 text-[9px] bg-indigo-600 px-1 rounded-full font-bold">x${count}</span>
-            <span class="text-[8px] text-slate-400 truncate max-w-full px-0.5">${t.name}</span>
-          `;
+          btn.innerHTML = `<span class="text-lg">${t.icon}</span><span class="absolute top-0.5 right-1 text-[9px] bg-indigo-600 px-1 rounded-full font-bold">x${count}</span><span class="text-[8px] text-slate-400 truncate px-0.5">${t.name}</span>`;
           tContainer.appendChild(btn);
         });
       }
@@ -1530,7 +1536,6 @@
         if (this.batteries > 0) {
           this.batteries--;
           this.batteryLevel = 100;
-          document.getElementById('hud-battery-bar').style.width = '100%';
           this.showBanner("🔋 懐中電灯を充電した！");
           soundFx.playBuy();
         }
@@ -1549,7 +1554,7 @@
         setTimeout(() => {
           banner.classList.add('opacity-0', 'translate-y-4');
           banner.classList.remove('opacity-100', 'translate-y-0');
-        }, 3200);
+        }, 3000);
       }
 
       initShopUI() {
@@ -1560,119 +1565,25 @@
         const modal = document.getElementById('shop-modal');
         modal.classList.toggle('hidden');
         document.getElementById('shop-coins').innerText = this.coins.toLocaleString();
-        if (!modal.classList.contains('hidden')) {
-          this.renderShopItems();
-        }
-      }
-
-      switchShopTab(tab) {
-        this.currentShopTab = tab;
-        ['weapons', 'armors', 'traps', 'upgrades'].forEach(t => {
-          const btn = document.getElementById(`tab-btn-${t}`);
-          if (t === tab) {
-            btn.className = "px-4 py-2 rounded-xl text-sm font-bold bg-amber-700 text-white";
-          } else {
-            btn.className = "px-4 py-2 rounded-xl text-sm font-bold bg-slate-800 text-slate-300";
-          }
-        });
-        this.renderShopItems();
+        if (!modal.classList.contains('hidden')) this.renderShopItems();
       }
 
       renderShopItems() {
         const grid = document.getElementById('shop-items-grid');
         grid.innerHTML = '';
-
-        if (this.currentShopTab === 'weapons') {
-          WEAPONS.forEach((w, idx) => {
-            const isOwned = w.owned;
-            const card = document.createElement('article');
-            card.className = "bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between";
-            card.innerHTML = `
-              <header class="flex justify-between items-center mb-2">
-                <span class="text-3xl">${w.icon}</span>
-                <span class="text-xs font-bold text-amber-400">攻撃力 +${w.atk}</span>
-              </header>
-              <main class="mb-4">
-                <h3 class="font-bold text-lg text-slate-100">${w.name}</h3>
-                <p class="text-xs text-slate-400 mt-1">${w.desc}</p>
-              </main>
-              <footer>
-                ${isOwned ? 
-                  `<button disabled class="w-full bg-slate-700 text-slate-400 font-bold py-2 rounded-xl text-xs">所持済み</button>` :
-                  `<button onclick="game.buyWeapon(${idx})" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 rounded-xl text-xs">💰 ${w.price} コインで購入</button>`
-                }
-              </footer>
-            `;
-            grid.appendChild(card);
-          });
-        } else if (this.currentShopTab === 'armors') {
-          ARMORS.forEach((a, idx) => {
-            const isOwned = (this.selectedArmorIndex === idx);
-            const card = document.createElement('article');
-            card.className = "bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between";
-            card.innerHTML = `
-              <header class="flex justify-between items-center mb-2">
-                <span class="text-3xl">🛡️</span>
-                <span class="text-xs font-bold text-cyan-400">軽減 ${a.def}%</span>
-              </header>
-              <main class="mb-4">
-                <h3 class="font-bold text-lg text-slate-100">${a.name}</h3>
-                <p class="text-xs text-slate-400 mt-1">${a.desc}</p>
-              </main>
-              <footer>
-                ${isOwned ? 
-                  `<button disabled class="w-full bg-slate-700 text-slate-400 font-bold py-2 rounded-xl text-xs">装備中</button>` :
-                  `<button onclick="game.buyArmor(${idx})" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 rounded-xl text-xs">💰 ${a.price} コインで装備</button>`
-                }
-              </footer>
-            `;
-            grid.appendChild(card);
-          });
-        } else if (this.currentShopTab === 'traps') {
-          TRAPS_DB.forEach((t) => {
-            const card = document.createElement('article');
-            card.className = "bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between";
-            card.innerHTML = `
-              <header class="flex justify-between items-center mb-2">
-                <span class="text-3xl">${t.icon}</span>
-                <span class="text-xs font-bold text-indigo-400">所持: ${this.inventoryTraps[t.id] || 0}</span>
-              </header>
-              <main class="mb-4">
-                <h3 class="font-bold text-lg text-slate-100">${t.name}</h3>
-                <p class="text-xs text-slate-400 mt-1">${t.desc}</p>
-              </main>
-              <footer>
-                <button onclick="game.buyTrap('${t.id}', ${t.price})" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 rounded-xl text-xs">💰 ${t.price} コインで購入</button>
-              </footer>
-            `;
-            grid.appendChild(card);
-          });
-        } else {
-          const items = [
-            { type: 'potion', name: "回復ポーション", price: 150, icon: "🧪", desc: "HPを60回復する" },
-            { type: 'battery', name: "電灯バッテリー", price: 100, icon: "🔋", desc: "懐中電灯を充電" },
-            { type: 'hpUpgrade', name: "最大HP拡張 (+20)", price: 400 * (this.upgrades.hpBoost + 1), icon: "❤️", desc: "最大体力の上限を永久に増加" },
-            { type: 'atkUpgrade', name: "攻撃力強化 (+15)", price: 500 * (this.upgrades.atkBoost + 1), icon: "⚡", desc: "全ての攻撃ダメージをアップ" }
-          ];
-
-          items.forEach((item) => {
-            const card = document.createElement('article');
-            card.className = "bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between";
-            card.innerHTML = `
-              <header class="flex justify-between items-center mb-2">
-                <span class="text-3xl">${item.icon}</span>
-              </header>
-              <main class="mb-4">
-                <h3 class="font-bold text-lg text-slate-100">${item.name}</h3>
-                <p class="text-xs text-slate-400 mt-1">${item.desc}</p>
-              </main>
-              <footer>
-                <button onclick="game.buyItem('${item.type}', ${item.price})" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded-xl text-xs">💰 ${item.price} コインで購入</button>
-              </footer>
-            `;
-            grid.appendChild(card);
-          });
-        }
+        WEAPONS.forEach((w, idx) => {
+          const card = document.createElement('article');
+          card.className = "bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between";
+          card.innerHTML = `
+            <header class="flex justify-between items-center mb-2"><span class="text-3xl">${w.icon}</span></header>
+            <main class="mb-4"><h3 class="font-bold text-lg text-slate-100">${w.name}</h3></main>
+            <footer>
+              ${w.owned ? `<button disabled class="w-full bg-slate-700 text-slate-400 font-bold py-2 rounded-xl text-xs">所持済み</button>` :
+              `<button onclick="game.buyWeapon(${idx})" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 rounded-xl text-xs">💰 ${w.price} コインで購入</button>`}
+            </footer>
+          `;
+          grid.appendChild(card);
+        });
       }
 
       buyWeapon(idx) {
@@ -1682,62 +1593,10 @@
           w.owned = true;
           this.selectedWeaponIndex = idx;
           soundFx.playBuy();
-          this.showBanner(`${w.name} を購入・装備した！`);
+          this.showBanner(`${w.name} を購入した！`);
           this.weaponRenderer.renderWeapon(idx);
           this.initQuickslotsUI();
           this.renderShopItems();
-          this.updateHUD();
-        } else {
-          this.showBanner("❌ コインが足りません");
-        }
-      }
-
-      buyArmor(idx) {
-        const a = ARMORS[idx];
-        if (this.coins >= a.price) {
-          this.coins -= a.price;
-          this.selectedArmorIndex = idx;
-          soundFx.playBuy();
-          this.showBanner(`${a.name} を装備した！`);
-          this.renderShopItems();
-          this.updateHUD();
-        } else {
-          this.showBanner("❌ コインが足りません");
-        }
-      }
-
-      buyTrap(trapId, price) {
-        if (this.coins >= price) {
-          this.coins -= price;
-          this.inventoryTraps[trapId] = (this.inventoryTraps[trapId] || 0) + 1;
-          soundFx.playBuy();
-          this.showBanner("トラップを購入した！");
-          this.initQuickslotsUI();
-          this.renderShopItems();
-          this.updateHUD();
-        } else {
-          this.showBanner("❌ コインが足りません");
-        }
-      }
-
-      buyItem(type, price) {
-        if (this.coins >= price) {
-          this.coins -= price;
-          soundFx.playBuy();
-          if (type === 'potion') this.potions++;
-          if (type === 'battery') this.batteries++;
-          if (type === 'hpUpgrade') {
-            this.upgrades.hpBoost++;
-            this.maxHp += 20;
-            this.hp += 20;
-          }
-          if (type === 'atkUpgrade') this.upgrades.atkBoost++;
-
-          this.showBanner("購入完了！");
-          this.renderShopItems();
-          this.updateHUD();
-        } else {
-          this.showBanner("❌ コインが足りません");
         }
       }
 
@@ -1758,17 +1617,13 @@
           this.updateDayCycle(delta);
           this.weaponRenderer.update(delta);
 
+          // Smooth Remote Players Lerp Movement
+          Object.values(this.otherPlayers).forEach(p => {
+            p.obj.mesh.position.lerp(p.targetPos, delta * 10);
+            p.obj.mesh.rotation.y = p.targetYaw;
+          });
+
           this.camera.quaternion.setFromEuler(this.cameraEuler);
-
-          if (this.flashlightOn && this.batteryLevel > 0) {
-            this.batteryLevel -= delta * 0.8;
-            document.getElementById('hud-battery-bar').style.width = `${Math.max(0, this.batteryLevel)}%`;
-            if (this.batteryLevel <= 0) {
-              this.flashlightOn = false;
-              this.flashlight.visible = false;
-            }
-          }
-
           this.renderer.render(this.scene, this.camera);
         };
 
@@ -1776,13 +1631,8 @@
       }
 
       updatePlayerMovement(delta) {
-        let moveX = 0;
-        let moveZ = 0;
-
-        if (this.joystickVector.x !== 0 || this.joystickVector.y !== 0) {
-          moveX = this.joystickVector.x;
-          moveZ = this.joystickVector.y;
-        }
+        let moveX = this.joystickVector.x;
+        let moveZ = this.joystickVector.y;
 
         if (this.keys['KeyW'] || this.keys['ArrowUp']) moveZ = -1;
         if (this.keys['KeyS'] || this.keys['ArrowDown']) moveZ = 1;
@@ -1794,7 +1644,7 @@
           const yawEuler = new THREE.Euler(0, this.cameraEuler.y, 0, 'YXZ');
           moveDir.applyEuler(yawEuler);
 
-          const moveSpeed = 6.8 + (this.upgrades.speedBoost * 0.6);
+          const moveSpeed = 6.8;
           this.camera.position.x += moveDir.x * moveSpeed * delta;
           this.camera.position.z += moveDir.z * moveSpeed * delta;
 
@@ -1804,27 +1654,116 @@
       }
 
       takeDamage(rawDamage) {
-        const armorDef = ARMORS[this.selectedArmorIndex].def;
-        const actualDamage = Math.max(1, rawDamage * (1 - armorDef / 100));
-        this.hp -= actualDamage;
-
+        this.hp -= rawDamage;
         if (this.hp <= 0) {
           this.hp = 0;
-          this.triggerGameOver();
+          document.getElementById('gameover-modal').classList.remove('hidden');
         }
         this.updateHUD();
       }
+    }
 
-      triggerGameOver() {
-        document.getElementById('gameover-modal').classList.remove('hidden');
-        document.getElementById('gameover-stats').innerText = 
-          `生存日数: DAY ${this.day} | 撃破数: ${this.kills} 体 | 獲得賞金: ${this.totalBountyEarned} コイン`;
+    // UI State & Modal Controller
+    class UIController {
+      constructor() {
+        this.playerName = "サバイバー";
+        this.playerIcon = "🧑‍🌾";
+        this.initSettingsUI();
+      }
+
+      initSettingsUI() {
+        const grid = document.getElementById('emoji-selector-grid');
+        EMOJI_OPTIONS.forEach(emoji => {
+          const btn = document.createElement('button');
+          btn.className = `text-2xl p-2 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 flex items-center justify-center ${emoji === this.playerIcon ? 'border-amber-500 bg-amber-950/60' : ''}`;
+          btn.innerText = emoji;
+          btn.onclick = () => {
+            this.playerIcon = emoji;
+            this.updateProfileDisplays();
+            this.initSettingsUI();
+          };
+          grid.appendChild(btn);
+        });
+
+        document.getElementById('setting-name-input').addEventListener('input', (e) => {
+          this.playerName = e.target.value.trim() || "サバイバー";
+          this.updateProfileDisplays();
+        });
+      }
+
+      updateProfileDisplays() {
+        document.getElementById('title-avatar-display').innerText = this.playerIcon;
+        document.getElementById('title-name-display').innerText = this.playerName;
+      }
+
+      openSettings() {
+        document.getElementById('settings-modal').classList.remove('hidden');
+      }
+
+      closeSettings() {
+        document.getElementById('settings-modal').classList.add('hidden');
+      }
+
+      openLobbyModal() {
+        document.getElementById('lobby-modal').classList.remove('hidden');
+      }
+
+      closeLobbyModal() {
+        document.getElementById('lobby-modal').classList.add('hidden');
+      }
+
+      switchLobbyTab(tab) {
+        const hostView = document.getElementById('lobby-host-view');
+        const joinView = document.getElementById('lobby-join-view');
+        const btnHost = document.getElementById('tab-host-btn');
+        const btnJoin = document.getElementById('tab-join-btn');
+
+        if (tab === 'host') {
+          hostView.classList.remove('hidden');
+          joinView.classList.add('hidden');
+          btnHost.className = "flex-1 py-2 rounded-xl font-bold bg-indigo-700 text-white";
+          btnJoin.className = "flex-1 py-2 rounded-xl font-bold bg-slate-800 text-slate-400";
+        } else {
+          hostView.classList.add('hidden');
+          joinView.classList.remove('hidden');
+          btnHost.className = "flex-1 py-2 rounded-xl font-bold bg-slate-800 text-slate-400";
+          btnJoin.className = "flex-1 py-2 rounded-xl font-bold bg-purple-700 text-white";
+        }
+      }
+
+      updateHostStartButton() {
+        const btn = document.getElementById('btn-start-multi');
+        if (multiNetwork.isHost && multiNetwork.members.length >= 1) {
+          btn.disabled = false;
+        } else {
+          btn.disabled = true;
+        }
+      }
+
+      startSoloGame() {
+        document.getElementById('title-screen').classList.add('hidden');
+        document.getElementById('hud-layer').classList.remove('hidden');
+        if (!game) game = new GameEngine();
+      }
+
+      launchGameFromLobby(isMulti = true) {
+        this.closeLobbyModal();
+        document.getElementById('title-screen').classList.add('hidden');
+        document.getElementById('hud-layer').classList.remove('hidden');
+
+        if (isMulti) {
+          document.getElementById('hud-multi-players').classList.remove('hidden');
+        }
+
+        if (!game) game = new GameEngine();
       }
     }
 
     let game;
+    let ui;
+
     window.onload = () => {
-      game = new GameEngine();
+      ui = new UIController();
     };
   </script>
 </body>
