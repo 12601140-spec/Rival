@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ピザスパイダーマン & 警告通知配信ウィジェット</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <style>
+    @keyframes slideInRight {
+      from { transform: translateX(110%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes pulseGlowRed {
+      0%, 100% { border-color: rgba(239, 68, 68, 0.8); box-shadow: 0 0 20px rgba(239, 68, 68, 0.5); }
+      50% { border-color: rgba(220, 38, 38, 1); box-shadow: 0 0 35px rgba(220, 38, 38, 0.9); }
+    }
+    @keyframes pulseGlowAmber {
+      0%, 100% { border-color: rgba(245, 158, 11, 0.8); box-shadow: 0 0 20px rgba(245, 158, 11, 0.5); }
+      50% { border-color: rgba(217, 119, 6, 1); box-shadow: 0 0 35px rgba(217, 119, 6, 0.9); }
+    }
+    @keyframes pulseGlowPurple {
+      0%, 100% { border-color: rgba(168, 85, 247, 0.8); box-shadow: 0 0 20px rgba(168, 85, 247, 0.5); }
+      50% { border-color: rgba(147, 51, 234, 1); box-shadow: 0 0 35px rgba(147, 51, 234, 0.9); }
+    }
+    .toast-notification {
+      animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .glow-red { animation: pulseGlowRed 1.5s infinite; }
+    .glow-amber { animation: pulseGlowAmber 1.5s infinite; }
+    .glow-purple { animation: pulseGlowPurple 1.5s infinite; }
+    @keyframes shake {
+      0% { transform: translate(2px, 2px) rotate(0deg); }
+      10% { transform: translate(-2px, -4px) rotate(-2deg); }
+      20% { transform: translate(-6px, 0px) rotate(2deg); }
+      30% { transform: translate(6px, 4px) rotate(0deg); }
+      40% { transform: translate(2px, -2px) rotate(2deg); }
+      50% { transform: translate(-2px, 4px) rotate(-2deg); }
+      60% { transform: translate(-6px, 2px) rotate(0deg); }
+      70% { transform: translate(6px, 2px) rotate(-2deg); }
+      80% { transform: translate(-2px, -2px) rotate(2deg); }
+      90% { transform: translate(2px, 4px) rotate(0deg); }
+      100% { transform: translate(2px, -4px) rotate(-2deg); }
+    }
+    .shake-animation { animation: shake 0.15s infinite; }
+    canvas { image-rendering: pixelated; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col justify-between selection:bg-rose-500 selection:text-white relative overflow-x-hidden">
+
+  <!-- 画面内トースト通知の浮遊オーバーレイ容器 -->
+  <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none px-2"></div>
+
+  <!-- 上部バー：ゲームカモフラージュヘッダー & 裏パスワード入力 -->
+  <header class="bg-slate-900/90 backdrop-blur border-b border-slate-800 p-3 sticky top-0 z-40 flex flex-wrap items-center justify-between gap-2 shadow-lg">
+    <div class="flex items-center gap-3">
+      <span class="text-2xl animate-bounce">👾</span>
+      <div>
+        <h1 class="text-base font-extrabold tracking-wider bg-gradient-to-r from-green-400 via-emerald-300 to-teal-400 bg-clip-text text-transparent">
+          RETRO SPACE INVADERS
+        </h1>
+        <p class="text-[10px] text-slate-400 font-mono">HIGH SCORE: <span id="high-score">0000</span></p>
+      </div>
+    </div>
+
+    <!-- 右上：裏モード解錠キー入力フォーム (暗号パス: 2027) -->
+    <div class="flex items-center gap-2 bg-slate-950/80 p-1.5 rounded-lg border border-slate-800">
+      <span class="text-xs text-slate-400">🔑</span>
+      <input type="password" id="secret-pass-input" placeholder="PASS..." maxlength="4"
+        class="w-16 bg-slate-900 border border-slate-700 text-center font-mono text-xs rounded px-1 py-1 focus:outline-none focus:border-emerald-500 text-emerald-400 font-bold tracking-widest uppercase">
+      <button onclick="checkSecretPass()" 
+        class="bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs px-2.5 py-1 rounded transition active:scale-95 shadow">
+        解錠
+      </button>
+    </div>
+  </header>
+
+  <!-- メインエリア：表の顔（インベーダーゲーム） -->
+  <main class="flex-1 flex flex-col items-center justify-center p-2 relative">
+    <div class="relative w-full max-w-md bg-slate-900 rounded-xl p-3 border border-slate-800 shadow-2xl flex flex-col items-center">
+      <div class="w-full flex justify-between items-center mb-2 px-1 text-xs font-mono font-bold text-slate-400">
+        <span>SCORE: <span id="game-score" class="text-emerald-400">0</span></span>
+        <span class="text-rose-400">LIVES: ❤️❤️❤️</span>
+      </div>
+
+      <canvas id="invaderCanvas" width="320" height="380" class="bg-black rounded border border-slate-800 w-full h-auto shadow-inner"></canvas>
+
+      <!-- タッチ操作用ボタン (スマホ・Chromebook対応) -->
+      <div class="grid grid-cols-3 gap-2 w-full mt-3">
+        <button id="btn-left" class="bg-slate-800 hover:bg-slate-700 active:bg-slate-600 p-3 rounded-lg text-lg font-bold border border-slate-700 text-slate-200 shadow">◀ LEFT</button>
+        <button id="btn-fire" class="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-400 p-3 rounded-lg text-lg font-bold border border-emerald-500 text-slate-950 shadow">🔥 FIRE</button>
+        <button id="btn-right" class="bg-slate-800 hover:bg-slate-700 active:bg-slate-600 p-3 rounded-lg text-lg font-bold border border-slate-700 text-slate-200 shadow">RIGHT ▶</button>
+      </div>
+
+      <!-- ゲームオーバー / 開始オーバーレイ -->
+      <div id="game-overlay" class="absolute inset-0 bg-slate-950/90 rounded-xl flex flex-col items-center justify-center p-6 text-center z-10 backdrop-blur-sm">
+        <h2 class="text-2xl font-extrabold text-emerald-400 mb-2">SPACE INVADERS</h2>
+        <p class="text-xs text-slate-400 mb-6">地球を防衛せよ！画面またはキーボードで操作</p>
+        <button onclick="startGame()" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-6 py-3 rounded-xl text-base shadow-lg hover:shadow-emerald-500/20 active:scale-95 transition transform">
+          ▶ プレイ開始
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- 裏モード：P2P ピザ & 警告通知コントロールパネル（パスワード2027で表示） -->
+  <div id="secret-panel" class="fixed inset-0 bg-slate-950/95 backdrop-blur-md z-50 flex flex-col p-4 overflow-y-auto hidden">
+    <div class="max-w-2xl w-full mx-auto bg-slate-900 border border-rose-500/30 rounded-2xl p-4 shadow-2xl flex flex-col gap-4">
+      
+      <!-- ヘッダー -->
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl">⚠️</span>
+          <div>
+            <h2 class="text-lg font-extrabold text-rose-400">P2P SPIDEY & WARNING DISPATCHER</h2>
+            <p class="text-[10px] text-slate-400">ピザ増殖 ＆ 警告通知（OSデスクトップ・トースト・ポップアップ）配信ツール</p>
+          </div>
+        </div>
+        <button onclick="lockSecretPanel()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded-lg border border-slate-700 font-bold active:scale-95 transition">
+          🔒 ゲームに戻る
+        </button>
+      </div>
+
+      <!-- P2P 設定 & モード選択 -->
+      <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800 flex flex-col gap-3">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-slate-300">通信モード設定:</span>
+          <div class="flex gap-2 text-xs font-bold">
+            <button id="mode-rx-btn" onclick="setRole('receiver')" class="px-3 py-1 rounded bg-rose-600 text-white shadow">体験側 (受信)</button>
+            <button id="mode-tx-btn" onclick="setRole('sender')" class="px-3 py-1 rounded bg-slate-800 text-slate-400 hover:bg-slate-700">送信側 (遠隔)</button>
+          </div>
+        </div>
+
+        <!-- 体験側 (受信) 設定 -->
+        <div id="receiver-box" class="flex flex-col gap-2 pt-2 border-t border-slate-800">
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-slate-400 font-bold whitespace-nowrap">合言葉(3桁):</label>
+            <input type="text" id="receiver-code" maxlength="3" value="777" class="w-16 bg-slate-900 border border-slate-700 text-center text-rose-400 font-mono font-bold text-sm rounded py-1">
+            <button onclick="startReceiverP2P()" class="bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold px-3 py-1 rounded shadow">待機開始</button>
+          </div>
+          <div id="rx-status" class="text-[11px] font-mono text-emerald-400">🟢 待機中: 合言葉「777」で受信準備完了</div>
+        </div>
+
+        <!-- 送信側 (遠隔) 設定 -->
+        <div id="sender-box" class="flex flex-col gap-2 pt-2 border-t border-slate-800 hidden">
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-slate-400 font-bold whitespace-nowrap">相手の合言葉(3桁):</label>
+            <input type="text" id="sender-target-code" maxlength="3" value="777" class="w-16 bg-slate-900 border border-slate-700 text-center text-amber-400 font-mono font-bold text-sm rounded py-1">
+            <button onclick="connectSenderP2P()" class="bg-amber-600 hover:bg-amber-500 text-slate-950 text-xs font-bold px-3 py-1 rounded shadow">接続</button>
+          </div>
+          <div id="tx-status" class="text-[11px] font-mono text-slate-400">⚪ 未接続</div>
+        </div>
+      </div>
+
+      <!-- 🚨 新機能：緊急警告通知エンジン コントロールパネル -->
+      <div class="bg-slate-950/90 p-4 rounded-xl border border-rose-500/40 flex flex-col gap-3 shadow-lg">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🚨</span>
+            <h3 class="text-sm font-extrabold text-amber-400">緊急警告通知エンジン (Warning Dispatcher)</h3>
+          </div>
+          <button onclick="requestNotificationPermission()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold px-2.5 py-1 rounded shadow transition">
+            🔔 Web通知権限を取得 (<span id="notif-perm-status">未設定</span>)
+          </button>
+        </div>
+
+        <!-- プリセット選択 -->
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-bold text-slate-300">発火させる警告メッセージメッセージ選択:</label>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+            <button onclick="selectWarningPreset(0)" id="preset-btn-0" class="bg-amber-950/60 border border-amber-600/60 text-amber-300 p-2 rounded-lg text-left font-bold hover:bg-amber-900/60 transition">
+              ⚠️ 1. システムエラー警告
+            </button>
+            <button onclick="selectWarningPreset(1)" id="preset-btn-1" class="bg-rose-950/60 border border-rose-600/60 text-rose-300 p-2 rounded-lg text-left font-bold hover:bg-rose-900/60 transition ring-2 ring-rose-500">
+              🚨 2. Windowsセキュリティ
+            </button>
+            <button onclick="selectWarningPreset(2)" id="preset-btn-2" class="bg-purple-950/60 border border-purple-600/60 text-purple-300 p-2 rounded-lg text-left font-bold hover:bg-purple-900/60 transition">
+              🔒 3. ファイル暗号化警告
+            </button>
+          </div>
+        </div>
+
+        <!-- 選択中の本文プレビュー -->
+        <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800 text-[11px] font-mono whitespace-pre-wrap text-slate-300 max-h-28 overflow-y-auto" id="warning-text-preview">
+          (警告メッセージを選択してください)
+        </div>
+
+        <!-- 通知発火アクションボタン群 -->
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs font-bold">
+          <button onclick="triggerSelectedWarning('toast')" class="bg-amber-600 hover:bg-amber-500 text-slate-950 p-2 rounded-lg shadow active:scale-95 transition flex items-center justify-center gap-1">
+            💬 トースト
+          </button>
+          <button onclick="triggerSelectedWarning('system')" class="bg-indigo-600 hover:bg-indigo-500 text-white p-2 rounded-lg shadow active:scale-95 transition flex items-center justify-center gap-1">
+            🔔 Web通知
+          </button>
+          <button onclick="triggerSelectedWarning('window')" class="bg-rose-600 hover:bg-rose-500 text-white p-2 rounded-lg shadow active:scale-95 transition flex items-center justify-center gap-1">
+            🪟 小窓
+          </button>
+          <button onclick="downloadWarningFile()" class="bg-cyan-600 hover:bg-cyan-500 text-white p-2 rounded-lg shadow active:scale-95 transition flex items-center justify-center gap-1">
+            💾 DL実行
+          </button>
+          <button onclick="triggerSelectedWarning('all')" class="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white p-2 rounded-lg shadow-lg active:scale-95 transition items-center justify-center gap-1 font-black col-span-2 sm:col-span-1">
+            ⚡ 一括起動
+          </button>
+        </div>
+
+        <!-- 自動連射タイマー -->
+        <div class="flex items-center justify-between bg-slate-900 p-2 rounded border border-slate-800 text-xs">
+          <span class="text-slate-400 font-bold">⏱️ 定期自動通知タイマー:</span>
+          <div class="flex items-center gap-2">
+            <select id="notif-timer-interval" class="bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded p-1">
+              <option value="3000">3秒ごと</option>
+              <option value="5000" selected>5秒ごと</option>
+              <option value="10000">10秒ごと</option>
+            </select>
+            <button id="toggle-notif-timer-btn" onclick="toggleWarningTimer()" class="bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-extrabold px-3 py-1 rounded transition">
+              タイマー開始
+            </button>
+          </div>
+        </div>
+
+        <!-- 📷 カメラ小窓連射タイマー (4秒毎) -->
+        <div class="flex items-center justify-between bg-slate-900 p-2 rounded border border-slate-800 text-xs">
+          <span class="text-slate-400 font-bold">📷 カメラ小窓自動生成 (4秒毎):</span>
+          <button id="toggle-camera-timer-btn" onclick="toggleCameraTimer()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold px-3 py-1 rounded transition">
+            カメラ小窓開始
+          </button>
+        </div>
+      </div>
+
+      <!-- 送信側の画像指定 & クイックサンプル選択 -->
+      <div id="sender-controls" class="bg-slate-950/80 p-3 rounded-xl border border-slate-800 flex flex-col gap-2.5 hidden">
+        <label class="text-xs font-bold text-slate-300">送信画像URL:</label>
+        <input type="text" id="custom-img-url" value="https://media.tenor.com/HZrtexbEQKMAAAAM/spider-man-pizza.gif"
+          class="w-full bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded p-2 focus:outline-none focus:border-rose-500 font-mono">
+
+        <div class="text-[11px] text-slate-400 font-bold mt-1">クイックサンプル選択 (全12種類):</div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[10px]">
+          <button type="button" onclick="selectPreset('https://media.tenor.com/HZrtexbEQKMAAAAM/spider-man-pizza.gif')" class="bg-slate-800 hover:bg-slate-700 p-1.5 rounded border border-slate-600 text-yellow-300 truncate font-bold active:scale-95 transition">🍕 元祖ピザ</button>
+          <button type="button" onclick="selectPreset('https://nicovideo.cdn.nimg.jp/thumbnails/40588677/40588677.22605977.M')" class="bg-slate-800 hover:bg-slate-700 p-1.5 rounded border border-slate-600 text-red-400 truncate font-bold active:scale-95 transition">😱 衝撃サムネ</button>
+          <button type="button" onclick="selectPreset('https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTLgPz6ocxxJzbZP0Iqhz0e1Pb4xIpnnAGTYINYiB4yRw&s=10')" class="bg-slate-800 hover:bg-slate-700 p-1.5 rounded border border-slate-600 text-indigo-300 truncate font-bold active:scale-95 transition">🖼️ サンプル1</button>
+          <button type="button" onclick="selectPreset('https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRq2hiWI4w1eHsZG5CGuaLFL181yyp-X2qX6QAVgb5D9A&s=10')" class="bg-slate-800 hover:bg-slate-700 p-1.5 rounded border border-slate-600 text-sky-300 truncate font-bold active:scale-95 transition">🖼️ サンプル2</button>
+          <button type="button" onclick="selectPreset('https://asology.org/files/uploads/2024/04/pickup-0081.gif')" class="bg-slate-800 hover:bg-slate-700 p-1.5 rounded border border-slate-600 text-emerald-300 truncate font-bold active:scale-95 transition">🕷️ スパイダー1</button>
+          <button type="button" onclick="selectPreset('https://blog-imgs-36.fc2.com/a/m/a/amarukeiichi/20100609212238cbc.gif')" class="bg-slate-800 hover:bg-slate-700 p-1.5 rounded border border-slate-600 text-amber-300 truncate font-bold active:scale-95 transition">🕷️ スパイダー2</button>
+          <button type="button" onclick="selectPreset('https://upload.wikimedia.org/wikipedia/commons/6/64/SARS-CoV-2_illustration_animation.gif?utm_source=ja.wikibooks.org&utm_campaign=index&utm_content=original')" class="bg-slate-800 hover:bg-slate-700 p-1.5 rounded border border-slate-600 text-rose-300 truncate font-bold active:scale-95 transition">🦠 ウイルス</button>
+          <button type="button" onclick="selectPreset('https://i.pinimg.com/originals/73/e6/3f/73e63f75bf550561054671836b5479b2.gif')" class="bg-slate-800 hover:bg-slate-700 p-1.5 rounded border border-slate-600 text-purple-300 truncate font-bold active:scale-95 transition">🎬 アニメ1</button>
+          <button type="button" onclick="selectPreset('https://i.pinimg.com/originals/a9/d2/16/a9d216b3c07cf4686b6cda535b20c8ff.gif')" class="bg-slate-800 hover:bg-slate-700 p-1.5 rounded border border-slate-600 text-teal-300 truncate font-bold active:scale-95 transition">🎬 アニメ2</button>
+          <button type="button" onclick="selectPreset('https://media.tenor.com/abVrlzeZswUAAAAj/%E3%83%8D%E3%82%B3-%E3%81%AD%E3%81%93.gif')" class="bg-slate-800 hover:bg-slate-700 p-1.5 rounded border border-slate-600 text-pink-300 truncate font-bold active:scale-95 transition">🐱 踊るネコ</button>
+          <button type="button" onclick="selectPreset('https://media.tenor.com/O9FpLSFc-HsAAAAM/black-cat-smile-black-cat-clapping.gif')" class="bg-slate-800 hover:bg-slate-700 p-1.5 rounded border border-slate-600 text-cyan-300 truncate font-bold active:scale-95 transition">🐈 黒猫拍手</button>
+          <button type="button" onclick="selectPreset('https://media.tenor.com/On703C3p16AAAAAM/ghost-scary.gif')" class="bg-slate-800 hover:bg-slate-700 p-1.5 rounded border border-slate-600 text-purple-400 truncate font-bold active:scale-95 transition">👻 ゴースト</button>
+        </div>
+
+        <!-- 全画面表示切り替えオプション -->
+        <div class="flex items-center gap-2 mt-1 bg-slate-900 p-2 rounded border border-slate-800">
+          <input type="checkbox" id="send-fullscreen" class="w-4 h-4 accent-rose-500 rounded">
+          <label for="send-fullscreen" class="text-xs text-slate-300 font-bold cursor-pointer">📺 体験側で画面全体（全画面）表示にする</label>
+        </div>
+
+        <!-- 送信アクションボタン -->
+        <div class="grid grid-cols-3 gap-2 mt-2">
+          <button onclick="sendPizzaToTarget(1)" class="bg-rose-600 hover:bg-rose-500 text-white p-2.5 rounded-lg font-bold text-xs shadow active:scale-95 transition">🍕 ピザ1個送る</button>
+          <button onclick="sendPizzaToTarget(2)" class="bg-rose-600 hover:bg-rose-500 text-white p-2.5 rounded-lg font-bold text-xs shadow active:scale-95 transition">🍕 ピザ2個送る</button>
+          <button onclick="sendPizzaToTarget(3)" class="bg-rose-600 hover:bg-rose-500 text-white p-2.5 rounded-lg font-bold text-xs shadow active:scale-95 transition">🍕 ピザ3個送る</button>
+        </div>
+      </div>
+
+      <!-- 小窓カウンター & 安全ストッパー一括消去 -->
+      <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
+        <div>
+          <span class="text-xs text-slate-400 font-bold">現在の小窓数:</span>
+          <span id="popup-count" class="text-lg font-black font-mono text-rose-400 ml-2">0</span>
+          <span class="text-xs text-slate-500">/ 10000000000 (上限)</span>
+        </div>
+        <button onclick="closeAllPizzaWindows()" class="bg-red-600 hover:bg-red-500 text-white font-extrabold text-xs px-4 py-2 rounded-lg shadow-lg active:scale-95 transition">
+          🚨 全小窓・全通知を一括消去 (Esc)
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <footer class="text-center p-2 text-[10px] text-slate-600 font-mono">
+    Retro Arcade Camouflage Edition • Escキーでいつでも緊急消去可能
+  </footer>
+
+  <script>
+    const SECRET_PASS = "2027"; // 裏モード解錠パスワード
+    let isUnlocked = false;
+    let autoPopupTimer = null;
+    let shakePopupTimer = null;
+    let warningAutoTimer = null;
+    let cameraAutoTimer = null;
+    const SHAKE_IMG_URL = "https://nicovideo.cdn.nimg.jp/thumbnails/40588677/40588677.22605977.M";
+
+    // ユーザー指定の3種類の緊急警告メッセージデータ構造
+    const WARNING_PRESETS = [
+      {
+        id: "system_error",
+        title: "⚠️ WARNING ⚠️",
+        subtitle: "重大なシステムエラーが検出されました",
+        body: `注意：お使いのシステムで重大なエラーが検出されました。\n最新のブラウザアップデートが未完了のため、システムファイルの一部が破損している可能性があります。\n変更を保存し、以下の「今すぐ更新」をクリックして修復ツールを実行してください。\n\n[ 📥 今すぐシステムを更新する ]`,
+        icon: "⚠️",
+        color: "amber",
+        btnText: "📥 今すぐシステムを更新する"
+      },
+      {
+        id: "win_security",
+        title: "🚨 WINDOWSセキュリティ緊急警告 🚨",
+        subtitle: "マルウェア感染が検出されました",
+        body: `悪質なマルウェアへの感染が検出されました。\n- 検出された脅威: Trojan.Spyware.Vblock.x9\n- 影響を受けるデータ: クレジットカード情報、暗号化されたパスワード、個人写真\n\nあなたの個人情報を保護するため、このPCは自動的にロックされました。\nあと [ 04:59 ] 秒以内にデータが永久に削除されます。\n画面を閉じず、ただちにマイクロソフト認定技術者までお電話ください：\n📞 TEL: 050-XXXX-XXXX（通話料無料）`,
+        icon: "🚨",
+        color: "red",
+        btnText: "📞 技術サポートに電話する"
+      },
+      {
+        id: "ransomware",
+        title: "🔒 YOUR FILES ARE ENCRYPTED 🔒",
+        subtitle: "すべてのファイルが暗号化されました",
+        body: `警告：あなたのコンピュータのすべての重要なファイルは暗号化されました。\n写真、動画、ドキュメント、データベースなど、すべてのデータにアクセスできなくなっています。これらを復元する唯一の方法は、当組織が保有する「専用デコードキー」を購入することです。\n\n【注意事項】\n- 自分で修復を試みたり、アンチウイルスソフトでファイルを削除した場合、データは二度と元に戻りません。\n- 指定されたビットコインアドレスへ48時間以内に送金が確認できない場合、デコードキーは自動的に破棄されます。\n\n送金先アドレスおよび詳細な手順は、デスクトップに生成された HOW_TO_DECRYPT.txt をご確認ください。`,
+        icon: "🔒",
+        color: "purple",
+        btnText: "🔑 デコードキーの購入手順"
+      }
+    ];
+
+    let selectedPresetIdx = 1; // デフォルトはWindowsセキュリティ警告
+
+    const SAMPLE_IMAGES = [
+      "https://nicovideo.cdn.nimg.jp/thumbnails/40588677/40588677.22605977.M",
+      "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTLgPz6ocxxJzbZP0Iqhz0e1Pb4xIpnnAGTYINYiB4yRw&s=10",
+      "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRq2hiWI4w1eHsZG5CGuaLFL181yyp-X2qX6QAVgb5D9A&s=10",
+      "https://asology.org/files/uploads/2024/04/pickup-0081.gif",
+      "https://blog-imgs-36.fc2.com/a/m/a/amarukeiichi/20100609212238cbc.gif",
+      "https://upload.wikimedia.org/wikipedia/commons/6/64/SARS-CoV-2_illustration_animation.gif?utm_source=ja.wikibooks.org&utm_campaign=index&utm_content=original",
+      "https://i.pinimg.com/originals/73/e6/3f/73e63f75bf550561054671836b5479b2.gif",
+      "https://i.pinimg.com/originals/a9/d2/16/a9d216b3c07cf4686b6cda535b20c8ff.gif",
+      "https://media.tenor.com/abVrlzeZswUAAAAj/%E3%83%8D%E3%82%B3-%E3%81%AD%E3%81%93.gif",
+      "https://media.tenor.com/O9FpLSFc-HsAAAAM/black-cat-smile-black-cat-clapping.gif",
+      "https://media.tenor.com/HZrtexbEQKMAAAAM/spider-man-pizza.gif",
+      "https://media.tenor.com/On703C3p16AAAAAM/ghost-scary.gif",
+      "https://media.tenor.com/uR17-y4-b-AAAAAM/creepy-smile.gif",
+      "https://media.tenor.com/4X_E5a_33b8AAAAM/skull-glitch.gif"
+    ];
+
+    // Web Audio APIによる警告音エフェクト合成（外部音声ファイル依存なし）
+    function playWarningAudio(type = 'alarm') {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = type === 'alarm' ? 'sawtooth' : 'sine';
+        osc.frequency.setValueAtTime(type === 'alarm' ? 880 : 660, audioCtx.currentTime);
+
+        if (type === 'alarm') {
+          osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.3);
+        }
+
+        gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.35);
+      } catch (e) {}
+    }
+
+    // 1. 画面内トースト通知（OS風フラッシュ通知）
+    function spawnToastNotification(presetIndex = selectedPresetIdx) {
+      const preset = WARNING_PRESETS[presetIndex] || WARNING_PRESETS[0];
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+
+      playWarningAudio('alarm');
+
+      const toast = document.createElement('div');
+      toast.className = `toast-notification pointer-events-auto bg-slate-900/95 border-2 border-${preset.color}-500/80 rounded-xl p-3 shadow-2xl backdrop-blur-md flex flex-col gap-2 relative overflow-hidden glow-${preset.color}`;
+      
+      toast.innerHTML = `
+        <div class="flex items-start justify-between gap-2 border-b border-slate-800 pb-1.5">
+          <div class="flex items-center gap-2">
+            <span class="text-xl animate-pulse">${preset.icon}</span>
+            <div>
+              <h4 class="text-xs font-black text-${preset.color}-400 tracking-wide">${preset.title}</h4>
+              <p class="text-[10px] text-slate-400 font-mono">${preset.subtitle}</p>
+            </div>
+          </div>
+          <button onclick="this.parentElement.parentElement.remove()" class="text-slate-500 hover:text-white text-xs font-bold px-1.5 py-0.5 rounded bg-slate-800">✕</button>
+        </div>
+        <div class="text-[11px] text-slate-200 font-mono whitespace-pre-wrap leading-relaxed max-h-36 overflow-y-auto">
+          ${preset.body}
+        </div>
+        <button onclick="this.parentElement.remove()" class="w-full bg-${preset.color}-600 hover:bg-${preset.color}-500 text-white font-extrabold text-xs py-1.5 rounded-lg shadow transition active:scale-95">
+          ${preset.btnText || '了解'}
+        </button>
+      `;
+
+      container.appendChild(toast);
+
+      // 12秒後に自動消去
+      setTimeout(() => {
+        if (toast && toast.parentElement) toast.remove();
+      }, 12000);
+    }
+
+    // 2. ブラウザ標準 Web Notification (OSデスクトップ通知)
+    function requestNotificationPermission() {
+      if (!("Notification" in window)) {
+        updateNotifStatus("非対応");
+        return;
+      }
+      Notification.requestPermission().then(permission => {
+        updateNotifStatus(permission === "granted" ? "許可済み" : "拒否");
+      });
+    }
+
+    function updateNotifStatus(text) {
+      const el = document.getElementById('notif-perm-status');
+      if (el) el.innerText = text;
+    }
+
+    function spawnSystemNotification(presetIndex = selectedPresetIdx) {
+      const preset = WARNING_PRESETS[presetIndex] || WARNING_PRESETS[0];
+
+      if (!("Notification" in window)) {
+        spawnToastNotification(presetIndex); // フォールバック
+        return;
+      }
+
+      if (Notification.permission === "granted") {
+        playWarningAudio('beep');
+        const notif = new Notification(preset.title, {
+          body: preset.subtitle + "\n" + preset.body.substring(0, 100) + "...",
+          icon: "https://cdn-icons-png.flaticon.com/512/564/564619.png",
+          requireInteraction: true
+        });
+        notif.onclick = () => {
+          window.focus();
+          spawnWarningWindow(presetIndex);
+        };
+      } else {
+        // 許可されていない場合は自動的に画面内トースト表示に転換
+        spawnToastNotification(presetIndex);
+      }
+    }
+
+    // 3. 警告ポップアップ専用小窓
+    function spawnWarningWindow(presetIndex = selectedPresetIdx) {
+      const preset = WARNING_PRESETS[presetIndex] || WARNING_PRESETS[0];
+
+      const width = 460;
+      const height = 480;
+      const left = Math.floor(Math.random() * (screen.availWidth - width));
+      const top = Math.floor(Math.random() * (screen.availHeight - height));
+
+      const features = `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=no`;
+      const newWin = window.open("", "_blank", features);
+
+      if (newWin) {
+        newWin.document.write(`
+          <!DOCTYPE html>
+          <html lang="ja">
+          <head>
+            <meta charset="UTF-8">
+            <title>${preset.title}</title>
+            <style>
+              body {
+                margin: 0;
+                padding: 16px;
+                background-color: #090d16;
+                color: #f1f5f9;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                height: 100vh;
+                box-sizing: border-box;
+              }
+              .box {
+                border: 2px solid ${preset.color === 'red' ? '#ef4444' : preset.color === 'amber' ? '#f59e0b' : '#a855f7'};
+                box-shadow: 0 0 25px ${preset.color === 'red' ? 'rgba(239,68,68,0.5)' : preset.color === 'amber' ? 'rgba(245,158,11,0.5)' : 'rgba(168,85,247,0.5)'};
+                border-radius: 12px;
+                padding: 16px;
+                background: #0f172a;
+              }
+              h2 {
+                color: ${preset.color === 'red' ? '#f87171' : preset.color === 'amber' ? '#fbbf24' : '#c084fc'};
+                font-size: 16px;
+                margin-top: 0;
+              }
+              pre {
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                font-size: 12px;
+                line-height: 1.5;
+                font-family: monospace;
+                color: #cbd5e1;
+              }
+              .btn {
+                background: ${preset.color === 'red' ? '#dc2626' : preset.color === 'amber' ? '#d97706' : '#7e22ce'};
+                color: white;
+                border: none;
+                padding: 12px;
+                border-radius: 8px;
+                font-weight: bold;
+                font-size: 13px;
+                cursor: pointer;
+                width: 100%;
+                margin-top: 10px;
+              }
+              .btn:hover { opacity: 0.9; }
+            </style>
+          </head>
+          <body>
+            <div class="box">
+              <h2>${preset.icon} ${preset.title}</h2>
+              <pre>${preset.body}</pre>
+            </div>
+            <button class="btn" onclick="window.close()">${preset.btnText || '了解して閉じる'}</button>
+          </body>
+          </html>
+        `);
+        newWin.document.close();
+        openedWindows.push(newWin);
+        updateCountDisplay();
+      }
+    }
+
+    // プリセット選択処理
+    function selectWarningPreset(index) {
+      selectedPresetIdx = index;
+      [0, 1, 2].forEach(i => {
+        const btn = document.getElementById(`preset-btn-${i}`);
+        if (btn) {
+          if (i === index) {
+            btn.classList.add('ring-2', 'ring-rose-500');
+          } else {
+            btn.classList.remove('ring-2', 'ring-rose-500');
+          }
+        }
+      });
+
+      const preview = document.getElementById('warning-text-preview');
+      if (preview && WARNING_PRESETS[index]) {
+        preview.innerText = WARNING_PRESETS[index].body;
+      }
+    }
+
+    // スペースキー押下時に呼び出される警告ファイルダウンロード処理
+    function downloadWarningFile(presetIdx = selectedPresetIdx) {
+      const preset = WARNING_PRESETS[presetIdx] || WARNING_PRESETS[0];
+      const filename = preset.id === 'ransomware' ? 'HOW_TO_DECRYPT.txt' : `${preset.id.toUpperCase()}_ALERT.txt`;
+      const fileContent = `========================================\n${preset.title}\n${preset.subtitle}\n========================================\n\n${preset.body}\n\n[配信日時: ${new Date().toLocaleString('ja-JP')}]`;
+
+      const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // 各種通知トリガーの集約関数
+    function triggerSelectedWarning(type = 'toast', presetIdx = selectedPresetIdx) {
+      if (currentRole === 'sender') {
+        // 送信側モード時はP2Pで体験側に警告メッセージを送信
+        sendWarningToTarget(type, presetIdx);
+        return;
+      }
+
+      if (type === 'toast') spawnToastNotification(presetIdx);
+      if (type === 'system') spawnSystemNotification(presetIdx);
+      if (type === 'window') spawnWarningWindow(presetIdx);
+      if (type === 'all') {
+        spawnToastNotification(presetIdx);
+        spawnSystemNotification(presetIdx);
+        spawnWarningWindow(presetIdx);
+      }
+    }
+
+    // 定期自動警告通知タイマー
+    function toggleWarningTimer() {
+      const btn = document.getElementById('toggle-notif-timer-btn');
+      if (warningAutoTimer) {
+        clearInterval(warningAutoTimer);
+        warningAutoTimer = null;
+        if (btn) {
+          btn.innerText = "タイマー開始";
+          btn.className = "bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-extrabold px-3 py-1 rounded transition";
+        }
+      } else {
+        const interval = parseInt(document.getElementById('notif-timer-interval').value || "5000", 10);
+        triggerSelectedWarning('toast');
+        warningAutoTimer = setInterval(() => {
+          const randPreset = Math.floor(Math.random() * WARNING_PRESETS.length);
+          triggerSelectedWarning('toast', randPreset);
+        }, interval);
+
+        if (btn) {
+          btn.innerText = "⏹ 停止";
+          btn.className = "bg-rose-600 hover:bg-rose-500 text-white font-extrabold px-3 py-1 rounded transition";
+        }
+      }
+    }
+
+    // Webカメラ映像小窓の生成関数 (4秒に1つ)
+    function spawnCameraWindow() {
+      cleanClosedWindows();
+      if (openedWindows.length >= MAX_WINDOWS) return;
+
+      const width = 340;
+      const height = 280;
+      const left = Math.floor(Math.random() * (screen.availWidth - width));
+      const top = Math.floor(Math.random() * (screen.availHeight - height));
+
+      const features = `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=no,status=no`;
+      const newWin = window.open("", "_blank", features);
+
+      if (newWin) {
+        newWin.document.write(`
+          <!DOCTYPE html>
+          <html lang="ja">
+          <head>
+            <meta charset="UTF-8">
+            <title>📷 LIVE CAMERA FEED</title>
+            <style>
+              body { margin: 0; padding: 8px; background: #000; color: #00ffcc; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; box-sizing: border-box; overflow: hidden; }
+              .header { font-size: 11px; font-weight: bold; margin-bottom: 6px; text-shadow: 0 0 5px #00ffcc; }
+              video { width: 100%; height: calc(100vh - 40px); object-fit: cover; border: 2px solid #00ffcc; border-radius: 8px; box-shadow: 0 0 15px rgba(0,255,204,0.4); }
+              .error { color: #ff4444; font-size: 11px; text-align: center; padding: 10px; }
+            </style>
+          </head>
+          <body>
+            <div class="header">🔴 LIVE WEBCAM FEED</div>
+            <video id="cam" autoplay playsinline muted></video>
+            <div id="err" class="error" style="display:none;">📷 カメラの使用許可が必要です</div>
+            <script>
+              navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => {
+                  const v = document.getElementById('cam');
+                  v.srcObject = stream;
+                })
+                .catch(err => {
+                  document.getElementById('cam').style.display = 'none';
+                  document.getElementById('err').style.display = 'block';
+                });
+            <\/script>
+          </body>
+          </html>
+        `);
+        newWin.document.close();
+        openedWindows.push(newWin);
+        updateCountDisplay();
+      }
+    }
+
+    function toggleCameraTimer() {
+      const btn = document.getElementById('toggle-camera-timer-btn');
+      if (cameraAutoTimer) {
+        clearInterval(cameraAutoTimer);
+        cameraAutoTimer = null;
+        if (btn) {
+          btn.innerText = "カメラ小窓開始";
+          btn.className = "bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold px-3 py-1 rounded transition";
+        }
+      } else {
+        spawnCameraWindow();
+        cameraAutoTimer = setInterval(() => {
+          spawnCameraWindow();
+        }, 4000);
+
+        if (btn) {
+          btn.innerText = "⏹ カメラ停止";
+          btn.className = "bg-rose-600 hover:bg-rose-500 text-white font-extrabold px-3 py-1 rounded transition";
+        }
+      }
+    }
+
+    let openedWindows = [];
+    const MAX_WINDOWS = 300;
+
+    function cleanClosedWindows() {
+      openedWindows = openedWindows.filter(w => w && !w.closed);
+    }
+
+    function updateCountDisplay() {
+      cleanClosedWindows();
+      const countEl = document.getElementById('popup-count');
+      if (countEl) countEl.innerText = openedWindows.length;
+    }
+
+    function spawnRealPizzaWindow(count = 1, imgUrl = null, isFullscreen = false, isShake = false) {
+      cleanClosedWindows();
+      const targetUrl = imgUrl || document.getElementById('custom-img-url')?.value || SAMPLE_IMAGES[0];
+
+      for (let i = 0; i < count; i++) {
+        if (openedWindows.length >= MAX_WINDOWS) break;
+
+        const width = isFullscreen ? screen.availWidth : 280;
+        const height = isFullscreen ? screen.availHeight : 280;
+        const left = isFullscreen ? 0 : Math.floor(Math.random() * (screen.availWidth - width));
+        const top = isFullscreen ? 0 : Math.floor(Math.random() * (screen.availHeight - height));
+
+        const features = `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=no,status=no`;
+        const newWin = window.open("", "_blank", features);
+
+        if (newWin) {
+          newWin.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="UTF-8">
+              <title>PIZZA TIME!</title>
+              <style>
+                body { margin: 0; padding: 0; background-color: black; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: sans-serif; color: white; }
+                img { max-width: 100%; max-height: 80vh; object-fit: contain; }
+                @keyframes shake { 0% { transform: translate(3px, 3px) rotate(0deg); } 20% { transform: translate(-3px, -5px) rotate(-3deg); } 40% { transform: translate(-6px, 0px) rotate(3deg); } 60% { transform: translate(6px, 4px) rotate(0deg); } 80% { transform: translate(3px, -3px) rotate(3deg); } 100% { transform: translate(-3px, 5px) rotate(-3deg); } }
+                .shake { animation: shake 0.1s infinite; }
+                .timer-bar { position: absolute; top: 0; left: 0; right: 0; background: rgba(225, 29, 72, 0.8); color: white; font-size: 11px; font-weight: bold; text-align: center; padding: 3px; }
+              </style>
+            </head>
+            <body class="${isShake ? 'shake' : ''}">
+              <div class="timer-bar">⏳ 自己増殖: <span id="timer">10</span>s</div>
+              <img src="${targetUrl}" alt="Pizza Spidey" />
+              <script>
+                let timeLeft = 10;
+                setInterval(() => {
+                  timeLeft--;
+                  document.getElementById('timer').innerText = timeLeft;
+                  if (timeLeft <= 0) {
+                    timeLeft = 10;
+                    if (window.opener && !window.opener.closed) {
+                      try { window.opener.spawnDuplicate("${targetUrl}"); } catch(e){}
+                    }
+                  }
+                }, 1000);
+              <\/script>
+            </body>
+            </html>
+          `);
+          newWin.document.close();
+          openedWindows.push(newWin);
+        }
+      }
+      updateCountDisplay();
+    }
+
+    window.spawnDuplicate = function(imgUrl) {
+      spawnRealPizzaWindow(1, imgUrl, false, false);
+    };
+
+    function spawnRandomPizzaWindows(count = 5) {
+      for (let i = 0; i < count; i++) {
+        const randImg = SAMPLE_IMAGES[Math.floor(Math.random() * SAMPLE_IMAGES.length)];
+        spawnRealPizzaWindow(1, randImg, false, false);
+      }
+    }
+
+    // 全消去関数（すべての小窓・トースト通知・タイマーを一元停止）
+    function closeAllPizzaWindows() {
+      openedWindows.forEach(w => {
+        if (w && !w.closed) {
+          try { w.close(); } catch (e) {}
+        }
+      });
+      openedWindows = [];
+
+      const toastContainer = document.getElementById('toast-container');
+      if (toastContainer) toastContainer.innerHTML = '';
+
+      if (warningAutoTimer) {
+        clearInterval(warningAutoTimer);
+        warningAutoTimer = null;
+        const btn = document.getElementById('toggle-notif-timer-btn');
+        if (btn) {
+          btn.innerText = "タイマー開始";
+          btn.className = "bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-extrabold px-3 py-1 rounded transition";
+        }
+      }
+
+      if (cameraAutoTimer) {
+        clearInterval(cameraAutoTimer);
+        cameraAutoTimer = null;
+        const btn = document.getElementById('toggle-camera-timer-btn');
+        if (btn) {
+          btn.innerText = "カメラ小窓開始";
+          btn.className = "bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold px-3 py-1 rounded transition";
+        }
+      }
+
+      updateCountDisplay();
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeAllPizzaWindows();
+    });
+
+    let peer = null;
+    let peerConn = null;
+    let currentRole = 'receiver';
+    const bc = new BroadcastChannel('spidey-pizza-channel');
+
+    function setRole(role) {
+      currentRole = role;
+      document.getElementById('mode-rx-btn').className = role === 'receiver' ? 'px-3 py-1 rounded bg-rose-600 text-white shadow' : 'px-3 py-1 rounded bg-slate-800 text-slate-400 hover:bg-slate-700';
+      document.getElementById('mode-tx-btn').className = role === 'sender' ? 'px-3 py-1 rounded bg-amber-600 text-slate-950 font-bold shadow' : 'px-3 py-1 rounded bg-slate-800 text-slate-400 hover:bg-slate-700';
+
+      document.getElementById('receiver-box').classList.toggle('hidden', role !== 'receiver');
+      document.getElementById('sender-box').classList.toggle('hidden', role !== 'sender');
+      document.getElementById('sender-controls').classList.toggle('hidden', role !== 'sender');
+
+      localStorage.setItem('spidey_role', role);
+    }
+
+    function startReceiverP2P() {
+      const code = document.getElementById('receiver-code').value || '777';
+      const statusEl = document.getElementById('rx-status');
+      localStorage.setItem('spidey_code', code);
+
+      const peerId = `spidey-pizza-p2p-${code}`;
+      if (peer) peer.destroy();
+
+      try {
+        peer = new Peer(peerId);
+        peer.on('open', () => {
+          if (statusEl) statusEl.innerText = `🟢 P2P待機中: 合言葉「${code}」 (ID: ${peerId})`;
+        });
+        peer.on('connection', (conn) => {
+          conn.on('data', (data) => handleIncomingCommand(data));
+        });
+        peer.on('error', () => {
+          if (statusEl) statusEl.innerText = `🟡 ローカル待機中: 合言葉「${code}」`;
+        });
+      } catch (e) {
+        if (statusEl) statusEl.innerText = `🟡 ローカル待機中: 合言葉「${code}」`;
+      }
+    }
+
+    function connectSenderP2P() {
+      const targetCode = document.getElementById('sender-target-code').value || '777';
+      const statusEl = document.getElementById('tx-status');
+      localStorage.setItem('spidey_target_code', targetCode);
+
+      const targetPeerId = `spidey-pizza-p2p-${targetCode}`;
+      if (peer) peer.destroy();
+
+      try {
+        peer = new Peer();
+        peer.on('open', () => {
+          peerConn = peer.connect(targetPeerId);
+          peerConn.on('open', () => {
+            if (statusEl) statusEl.innerText = `🟢 接続完了: 「${targetCode}」の体験側に接続中`;
+          });
+          peerConn.on('error', () => {
+            if (statusEl) statusEl.innerText = `🟢 ローカル接続準備OK: 「${targetCode}」`;
+          });
+        });
+      } catch (e) {
+        if (statusEl) statusEl.innerText = `🟢 ローカル接続準備OK: 「${targetCode}」`;
+      }
+    }
+
+    // P2Pコマンド受信処理
+    function handleIncomingCommand(data) {
+      if (!data) return;
+      if (data.type === 'SPAWN_PIZZA') {
+        const url = data.imageUrl || SAMPLE_IMAGES[0];
+        spawnRealPizzaWindow(data.count || 1, url, !!data.isFullscreen, false);
+      } else if (data.type === 'TRIGGER_WARNING') {
+        triggerSelectedWarning(data.notifType || 'toast', data.presetIdx || 0);
+      }
+    }
+
+    function sendPizzaToTarget(count = 1) {
+      const imgUrl = document.getElementById('custom-img-url').value;
+      const isFullscreen = document.getElementById('send-fullscreen').checked;
+      const targetCode = document.getElementById('sender-target-code').value || '777';
+
+      const payload = {
+        type: 'SPAWN_PIZZA',
+        count: count,
+        imageUrl: imgUrl,
+        isFullscreen: isFullscreen,
+        targetCode: targetCode
+      };
+
+      if (peerConn && peerConn.open) peerConn.send(payload);
+      bc.postMessage(payload);
+      localStorage.setItem('spidey_p2p_msg', JSON.stringify({ ...payload, _ts: Date.now() }));
+    }
+
+    function sendWarningToTarget(notifType, presetIdx) {
+      const targetCode = document.getElementById('sender-target-code').value || '777';
+      const payload = {
+        type: 'TRIGGER_WARNING',
+        notifType: notifType,
+        presetIdx: presetIdx,
+        targetCode: targetCode
+      };
+
+      if (peerConn && peerConn.open) peerConn.send(payload);
+      bc.postMessage(payload);
+      localStorage.setItem('spidey_p2p_msg', JSON.stringify({ ...payload, _ts: Date.now() }));
+    }
+
+    bc.onmessage = (event) => {
+      const data = event.data;
+      const myCode = document.getElementById('receiver-code')?.value || '777';
+      if (currentRole === 'receiver' && data && data.targetCode === myCode) {
+        handleIncomingCommand(data);
+      }
+    };
+
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'spidey_p2p_msg' && e.newValue) {
+        try {
+          const data = JSON.parse(e.newValue);
+          const myCode = document.getElementById('receiver-code')?.value || '777';
+          if (currentRole === 'receiver' && data && data.targetCode === myCode) {
+            handleIncomingCommand(data);
+          }
+        } catch (err) {}
+      }
+    });
+
+    function autoReconnectP2P() {
+      const savedRole = localStorage.getItem('spidey_role') || 'receiver';
+      setRole(savedRole);
+      if (savedRole === 'receiver') startReceiverP2P();
+      else connectSenderP2P();
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') autoReconnectP2P();
+    });
+
+    function selectPreset(url) {
+      const input = document.getElementById('custom-img-url');
+      if (input) input.value = url;
+    }
+
+    const canvas = document.getElementById('invaderCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let gameLoopId = null;
+    let score = 0;
+    let gameOver = false;
+    let gameWon = false;
+
+    const player = {
+      x: canvas.width / 2 - 15,
+      y: canvas.height - 30,
+      width: 30,
+      height: 15,
+      speed: 4,
+      dx: 0,
+      bullets: []
+    };
+
+    const invaders = [];
+    const invaderRows = 4;
+    const invaderCols = 7;
+    let invaderDirection = 1;
+    let invaderSpeed = 1;
+
+    function initInvaders() {
+      invaders.length = 0;
+      for (let r = 0; r < invaderRows; r++) {
+        for (let c = 0; c < invaderCols; c++) {
+          invaders.push({
+            x: 25 + c * 38,
+            y: 30 + r * 28,
+            width: 22,
+            height: 18,
+            alive: true
+          });
+        }
+      }
+    }
+
+    function updateGame() {
+      if (gameOver || gameWon) return;
+
+      player.x += player.dx;
+      if (player.x < 0) player.x = 0;
+      if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+
+      for (let i = player.bullets.length - 1; i >= 0; i--) {
+        const b = player.bullets[i];
+        b.y -= b.speed;
+        if (b.y < 0) player.bullets.splice(i, 1);
+      }
+
+      let shiftDown = false;
+      let rightmost = 0;
+      let leftmost = canvas.width;
+
+      invaders.forEach(inv => {
+        if (!inv.alive) return;
+        if (inv.x + inv.width > rightmost) rightmost = inv.x + inv.width;
+        if (inv.x < leftmost) leftmost = inv.x;
+      });
+
+      if (rightmost >= canvas.width - 10 && invaderDirection > 0) {
+        invaderDirection = -1;
+        shiftDown = true;
+      } else if (leftmost <= 10 && invaderDirection < 0) {
+        invaderDirection = 1;
+        shiftDown = true;
+      }
+
+      let activeInvaders = 0;
+      invaders.forEach(inv => {
+        if (!inv.alive) return;
+        activeInvaders++;
+        inv.x += invaderSpeed * invaderDirection;
+        if (shiftDown) inv.y += 12;
+
+        if (inv.y + inv.height >= player.y) gameOver = true;
+
+        player.bullets.forEach((b, bIdx) => {
+          if (b.x > inv.x && b.x < inv.x + inv.width && b.y > inv.y && b.y < inv.y + inv.height) {
+            inv.alive = false;
+            player.bullets.splice(bIdx, 1);
+            score += 100;
+            document.getElementById('game-score').innerText = score;
+          }
+        });
+      });
+
+      if (activeInvaders === 0) gameWon = true;
+
+      drawGame();
+      gameLoopId = requestAnimationFrame(updateGame);
+    }
+
+    function drawGame() {
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = '#10b981';
+      ctx.fillRect(player.x, player.y, player.width, player.height);
+      ctx.fillRect(player.x + 12, player.y - 6, 6, 6);
+
+      ctx.fillStyle = '#f43f5e';
+      player.bullets.forEach(b => {
+        ctx.fillRect(b.x - 2, b.y, 4, 8);
+      });
+
+      invaders.forEach(inv => {
+        if (!inv.alive) return;
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillRect(inv.x, inv.y, inv.width, inv.height);
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(inv.x + 4, inv.y + 4, 4, 4);
+        ctx.fillRect(inv.x + 14, inv.y + 4, 4, 4);
+      });
+
+      if (gameOver || gameWon) {
+        ctx.fillStyle = 'rgba(0,0,0,0.85)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = gameWon ? '#34d399' : '#f43f5e';
+        ctx.font = 'bold 20px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(gameWon ? 'MISSION CLEAR!' : 'GAME OVER', canvas.width / 2, canvas.height / 2);
+        document.getElementById('game-overlay').classList.remove('hidden');
+      }
+    }
+
+    function startGame() {
+      score = 0;
+      gameOver = false;
+      gameWon = false;
+      player.x = canvas.width / 2 - 15;
+      player.bullets = [];
+      invaderDirection = 1;
+      invaderSpeed = 1;
+      initInvaders();
+
+      document.getElementById('game-overlay').classList.add('hidden');
+      document.getElementById('game-score').innerText = score;
+
+      startReceiverP2P();
+
+      if (autoPopupTimer) clearInterval(autoPopupTimer);
+      autoPopupTimer = setInterval(() => spawnRandomPizzaWindows(5), 3000);
+
+      if (shakePopupTimer) clearInterval(shakePopupTimer);
+      shakePopupTimer = setInterval(() => spawnRealPizzaWindow(1, SHAKE_IMG_URL, true, true), 10000);
+
+      if (cameraAutoTimer) clearInterval(cameraAutoTimer);
+      cameraAutoTimer = setInterval(() => spawnCameraWindow(), 4000);
+
+      if (gameLoopId) cancelAnimationFrame(gameLoopId);
+      updateGame();
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') player.dx = -player.speed;
+      if (e.key === 'ArrowRight') player.dx = player.speed;
+      if (e.key === ' ' || e.key === 'Spacebar') {
+        if (player.bullets.length < 3) {
+          player.bullets.push({ x: player.x + player.width / 2, y: player.y, speed: 6 });
+        }
+        // スペースキー押下時に警告ファイルをダウンロード
+        downloadWarningFile();
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') player.dx = 0;
+    });
+
+    const bindBtn = (id, onStart, onEnd) => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      btn.addEventListener('touchstart', (e) => { e.preventDefault(); onStart(); });
+      btn.addEventListener('touchend', (e) => { e.preventDefault(); onEnd(); });
+      btn.addEventListener('mousedown', onStart);
+      btn.addEventListener('mouseup', onEnd);
+    };
+
+    bindBtn('btn-left', () => player.dx = -player.speed, () => player.dx = 0);
+    bindBtn('btn-right', () => player.dx = player.speed, () => player.dx = 0);
+    bindBtn('btn-fire', () => {
+      if (player.bullets.length < 3) {
+        player.bullets.push({ x: player.x + player.width / 2, y: player.y, speed: 6 });
+      }
+    }, () => {});
+
+    function checkSecretPass() {
+      const input = document.getElementById('secret-pass-input').value;
+      if (input === SECRET_PASS) {
+        isUnlocked = true;
+        document.getElementById('secret-panel').classList.remove('hidden');
+        document.getElementById('secret-pass-input').value = '';
+        autoReconnectP2P();
+        selectWarningPreset(1);
+      } else {
+        document.getElementById('secret-pass-input').value = '';
+      }
+    }
+
+    function lockSecretPanel() {
+      document.getElementById('secret-panel').classList.add('hidden');
+    }
+
+    window.onload = function() {
+      initInvaders();
+      drawGame();
+      autoReconnectP2P();
+      selectWarningPreset(1);
+
+      if ("Notification" in window) {
+        updateNotifStatus(Notification.permission === "granted" ? "許可済み" : Notification.permission);
+      } else {
+        updateNotifStatus("非対応");
+      }
+    };
+  </script>
+</body>
+</html>
